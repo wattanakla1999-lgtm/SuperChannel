@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { classNames } from "@/lib/class-names";
+import { useTranslations } from "next-intl";
 
 const THEME_STORAGE_KEY = "superchannel-theme";
 
@@ -26,6 +27,7 @@ export function ThemeToggle({
   className?: string;
   compact?: boolean;
 }) {
+  const t = useTranslations("theme");
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => {
@@ -55,8 +57,8 @@ export function ThemeToggle({
         className,
       )}
       aria-pressed={isDark}
-      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      aria-label={isDark ? t("useLight") : t("useDark")}
+      title={isDark ? t("useLight") : t("useDark")}
     >
       <span
         aria-hidden="true"
@@ -67,7 +69,7 @@ export function ThemeToggle({
       >
         <span className="block h-4 w-4 rounded-full bg-white" />
       </span>
-      {!compact ? <span>{isDark ? "Dark mode" : "Light mode"}</span> : null}
+      {!compact ? <span>{isDark ? t("dark") : t("light")}</span> : null}
     </button>
   );
 }

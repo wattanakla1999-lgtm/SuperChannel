@@ -1,5 +1,6 @@
 import { classNames } from "@/lib/class-names";
 import { ThreadStatus } from "../types/inbox";
+import { useTranslations } from "next-intl";
 
 const statusClasses: Record<ThreadStatus, string> = {
   open: "bg-emerald-100 text-emerald-700",
@@ -16,6 +17,7 @@ export default function DetailSection({
   label: string;
   value: string;
 }) {
+  const t = useTranslations("inbox.filters");
   return (
     <div className="space-y-2">
       <p className="text-xs font-semibold tracking-[0.2em] text-slate-500 uppercase dark:text-slate-400">
@@ -28,7 +30,7 @@ export default function DetailSection({
             statusClasses[value as ThreadStatus],
           )}
         >
-          {value}
+          {t(value as ThreadStatus)}
         </span>
       ) : (
         <p className="text-sm leading-6 text-slate-700 dark:text-slate-300">{value}</p>

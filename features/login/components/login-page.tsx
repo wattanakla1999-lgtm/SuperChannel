@@ -1,7 +1,9 @@
 import { LoginForm } from "./login-form";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { getTranslations } from "next-intl/server";
 
-export function LoginPage() {
+export async function LoginPage() {
+  const t = await getTranslations("login");
   return (
     <main className="flex min-h-screen flex-1 bg-[radial-gradient(circle_at_top,#e0f2fe,transparent_38%),linear-gradient(180deg,#f8fafc_0%,#e2e8f0_100%)] px-4 py-10 text-slate-950 dark:bg-[radial-gradient(circle_at_top,#164e63,transparent_32%),linear-gradient(180deg,#020617_0%,#0f172a_100%)] dark:text-slate-100">
       <div className="mx-auto flex w-full max-w-5xl items-center justify-center">
@@ -18,7 +20,7 @@ export function LoginPage() {
                       SuperChannel
                     </p>
                     <p className="text-xs text-slate-300">
-                      Unified conversations and publishing
+                      {t("tagline")}
                     </p>
                   </div>
                 </div>
@@ -26,20 +28,18 @@ export function LoginPage() {
               </div>
               <div className="space-y-4">
                 <h1 className="max-w-md text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-                  Welcome back to your operations console.
+                  {t("welcome")}
                 </h1>
                 <p className="max-w-lg text-base leading-7 text-slate-300">
-                  Sign in with the mock admin account to access the inbox,
-                  review conversations, and continue testing the authenticated
-                  workflow.
+                  {t("intro")}
                 </p>
               </div>
             </div>
 
             <div className="grid gap-3 rounded-3xl border border-white/10 bg-white/5 p-5 text-sm text-slate-200">
-              <p className="font-semibold text-white">Demo access</p>
-              <p>Email: admin@superchannel.local</p>
-              <p>Password: SuperChannel123!</p>
+              <p className="font-semibold text-white">{t("demoAccess")}</p>
+              <p>{t("emailValue", { email: "admin@superchannel.local" })}</p>
+              <p>{t("passwordValue", { password: "SuperChannel123!" })}</p>
             </div>
           </section>
 
@@ -47,14 +47,13 @@ export function LoginPage() {
             <div className="mx-auto w-full max-w-md space-y-8">
               <div className="space-y-3">
                 <p className="text-sm font-semibold tracking-[0.24em] text-sky-700 uppercase dark:text-cyan-300">
-                  Login
+                  {t("eyebrow")}
                 </p>
                 <h2 className="text-3xl font-semibold tracking-tight text-slate-950 dark:text-slate-100">
-                  Sign in
+                  {t("title")}
                 </h2>
                 <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
-                  Use the mock credentials from the secure server-side config to
-                  create an HTTP-only session and continue to the inbox.
+                  {t("description")}
                 </p>
               </div>
 

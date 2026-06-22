@@ -14,6 +14,7 @@ import type {
   SettingsResponse,
   WorkspaceProfileInput,
   WorkspaceProfileSettings,
+  AppLocale,
 } from "@/features/settings/types/settings";
 import { listMockAssignableAgents } from "@/server/team/mock-team-data";
 
@@ -35,7 +36,7 @@ function createInitialWorkspaceProfile(): WorkspaceProfileSettings {
   return {
     businessName: "SuperChannel Demo Workspace",
     email: "ops@superchannel.local",
-    language: "English",
+    language: "en",
     logoPreview: "SC",
     phone: "+66 2 123 4567",
     timezone: "Asia/Bangkok",
@@ -250,17 +251,29 @@ export function updateMockWorkspaceProfile(
 
   assertValidEmail(input.email.trim());
 
+  if (input.language !== "en" && input.language !== "th") {
+    const error = new Error("Unsupported locale.");
+    error.name = "INVALID";
+    throw error;
+  }
+
   const state = getSessionState(sessionId);
   state.workspaceProfile = {
     ...state.workspaceProfile,
     businessName: input.businessName.trim(),
     email: input.email.trim(),
-    language: input.language.trim() || "English",
+    language: input.language,
     phone: input.phone.trim(),
     timezone: input.timezone.trim() || "Asia/Bangkok",
   };
 
   return { ...state.workspaceProfile };
+}
+
+export function updateMockLocalePreference(sessionId: string, locale: AppLocale) {
+  const state = getSessionState(sessionId);
+  state.workspaceProfile.language = locale;
+  return locale;
 }
 
 export function updateMockBusinessHours(
@@ -423,4 +436,3 @@ export function deleteMockSavedReply(
   const state = getSessionState(sessionId);
   return state.savedReplies.delete(replyId);
 }
-

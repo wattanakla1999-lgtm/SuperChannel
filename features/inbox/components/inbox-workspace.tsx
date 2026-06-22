@@ -8,6 +8,7 @@ import { Spinner } from "@/components/ui/spinner";
 import type { SavedReply } from "@/features/settings/types/settings";
 import { classNames } from "@/lib/class-names";
 import { ApiError } from "@/lib/http/api-error";
+import { useFormatter, useTranslations } from "next-intl";
 import {
   useEffect,
   useRef,
@@ -39,18 +40,11 @@ import {
   type InboxChannel,
   type PanelWidths
 } from "../types/inbox";
-import { formatTimestamp } from "../utils/format";
 import CustomerPanel from "./CustomerPanel";
 import MessageBubble from "./MessageBubble";
 import PanelResizeDivider from "./PanelResizeDivider";
 
-const filters: Array<{ label: string; value: ConversationStatus }> = [
-  { label: "All", value: "all" },
-  { label: "Unread", value: "unread" },
-  { label: "Open", value: "open" },
-  { label: "Pending", value: "pending" },
-  { label: "Resolved", value: "resolved" },
-];
+const filters: ConversationStatus[] = ["all", "unread", "open", "pending", "resolved"];
 
 const channelClasses: Record<InboxChannel, string> = {
   Facebook: "bg-blue-100 text-blue-700",
@@ -112,6 +106,17 @@ export function InboxWorkspace({
 }: {
   initialConversationId?: string | null;
 }) {
+  const format = useFormatter();
+  const t = useTranslations("inbox");
+  const tCommon = useTranslations("common");
+  const formatTimestamp = (value: string) =>
+    format.dateTime(new Date(value), {
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      month: "short",
+      timeZone: "Asia/Bangkok",
+    });
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(
     null,
@@ -323,8 +328,8 @@ export function InboxWorkspace({
 
         setListError(
           isUnauthorized(error)
-            ? "Your session has expired. Please sign in again."
-            : "We couldn't load the inbox right now.",
+            ? tCommon("sessionExpired")
+            : t("loadError"),
         );
       } finally {
         if (isMounted) {
@@ -338,7 +343,7 @@ export function InboxWorkspace({
     return () => {
       isMounted = false;
     };
-  }, [initialConversationId]);
+  }, [initialConversationId, t, tCommon]);
 
   const normalizedSearch = searchTerm.trim().toLowerCase();
   const visibleConversations = conversations.filter((conversation) => {
@@ -391,8 +396,8 @@ export function InboxWorkspace({
 
         setDetailError(
           isUnauthorized(error)
-            ? "Your session has expired. Please sign in again."
-            : "We couldn't load this conversation.",
+            ? tCommon("sessionExpired")
+            : t("conversationError"),
         );
       } finally {
         if (isMounted) {
@@ -406,7 +411,7 @@ export function InboxWorkspace({
     return () => {
       isMounted = false;
     };
-  }, [selectedConversationId]);
+  }, [selectedConversationId, t, tCommon]);
 
   const handleSelectConversation = (conversationId: string) => {
     setActiveConversationId(conversationId);
@@ -453,7 +458,7 @@ export function InboxWorkspace({
       setComposerError(
         error instanceof ApiError
           ? error.message
-          : "We couldn't send your message.",
+          : t("sendError"),
       );
     } finally {
       setIsSending(false);
@@ -476,7 +481,7 @@ export function InboxWorkspace({
       setSavedRepliesError(
         error instanceof ApiError
           ? error.message
-          : "We couldn't load saved replies.",
+          : t("savedRepliesError"),
       );
     } finally {
       setIsSavedRepliesLoading(false);
@@ -538,25 +543,25 @@ export function InboxWorkspace({
               <Input
                 data-testid="conversation-search"
                 disabled={!areFiltersInteractive}
-                placeholder="Search conversations"
+                placeholder={t("search")}
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
               />
               <div className="mt-4 flex flex-wrap gap-2">
                 {filters.map((filter) => (
                   <button
-                    key={filter.value}
+                    key={filter}
                     type="button"
                     disabled={!areFiltersInteractive}
                     className={classNames(
                       "rounded-full px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60",
-                      activeFilter === filter.value
+                      activeFilter === filter
                         ? "bg-slate-950 text-white dark:bg-cyan-500 dark:text-slate-950"
                         : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700",
                     )}
-                    onClick={() => setActiveFilter(filter.value)}
+                    onClick={() => setActiveFilter(filter)}
                   >
-                    {filter.label}
+                    {t(`filters.${filter}`)}
                   </button>
                 ))}
               </div>
@@ -569,7 +574,7 @@ export function InboxWorkspace({
               {isListLoading ? (
                 <div className="flex h-full items-center justify-center text-sm text-slate-500 dark:text-slate-400">
                   <Spinner className="mr-2 text-slate-400 dark:text-slate-500" />
-                  Loading conversations...
+                  {t("loadingList")}
                 </div>
               ) : listError ? (
                 <div className="p-2">
@@ -577,7 +582,7 @@ export function InboxWorkspace({
                 </div>
               ) : visibleConversations.length === 0 ? (
                 <div className="flex h-full items-center justify-center rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
-                  No conversations match your search.
+                  {t("emptySearch")}
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -660,16 +665,16 @@ export function InboxWorkspace({
                     className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 dark:border-slate-700 dark:text-slate-300 lg:hidden"
                     onClick={() => setIsMobileDetailOpen(false)}
                   >
-                    Back
+                    {tCommon("back")}
                   </button>
                   <div>
                     <p className="text-sm font-semibold text-slate-950 dark:text-slate-100">
-                      {activeConversation?.customerName ?? "Inbox"}
+                      {activeConversation?.customerName ?? t("selectConversation")}
                     </p>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
                       {activeConversation
-                        ? `${activeConversation.channel} conversation`
-                        : "Select a conversation to view messages"}
+                        ? t("channelConversation", { channel: activeConversation.channel })
+                        : t("selectConversation")}
                     </p>
                   </div>
                 </div>
@@ -679,7 +684,7 @@ export function InboxWorkspace({
                     className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 dark:border-slate-700 dark:text-slate-300 lg:hidden"
                     onClick={() => setIsCustomerDrawerOpen(true)}
                   >
-                    Customer
+                    {t("customer")}
                   </button>
                 ) : null}
               </div>
@@ -688,7 +693,7 @@ export function InboxWorkspace({
             {isDetailLoading ? (
               <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-slate-500 dark:text-slate-400">
                 <Spinner className="mr-2 text-slate-400 dark:text-slate-500" />
-                Loading conversation...
+                {t("loadingConversation")}
               </div>
             ) : detailError ? (
               <div className="p-4">
@@ -696,7 +701,7 @@ export function InboxWorkspace({
               </div>
             ) : !activeConversation ? (
               <div className="flex min-h-0 flex-1 items-center justify-center p-6 text-center text-sm text-slate-500 dark:text-slate-400">
-                Select a conversation from the list to start working the thread.
+                {t("selectThread")}
               </div>
             ) : (
               <>
@@ -719,14 +724,14 @@ export function InboxWorkspace({
                     <textarea
                       data-testid="message-input"
                       className="min-h-28 rounded-[1.25rem] border border-slate-200 px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus-visible:border-slate-400 focus-visible:ring-2 focus-visible:ring-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus-visible:border-cyan-500 dark:focus-visible:ring-slate-800"
-                      placeholder="Reply to the customer"
+                      placeholder={t("replyPlaceholder")}
                       value={messageDraft}
                       onChange={(event) => setMessageDraft(event.target.value)}
                       disabled={!activeConversation || isSending}
                     />
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-xs text-slate-500 dark:text-slate-400">
-                        Messages are stored in memory for this mock session.
+                        {t("mockStorage")}
                       </p>
                       <div className="flex flex-wrap items-center justify-end gap-3">
                         <Button
@@ -734,7 +739,7 @@ export function InboxWorkspace({
                           onClick={() => void handleOpenSavedReplies()}
                           variant="secondary"
                         >
-                          Saved replies
+                          {t("savedReplies")}
                         </Button>
                         <Button
                           data-testid="send-message-button"
@@ -743,7 +748,7 @@ export function InboxWorkspace({
                           onClick={handleSendMessage}
                           disabled={!activeConversation || !messageDraft.trim()}
                         >
-                          {isSending ? "Sending..." : "Send message"}
+                          {isSending ? t("sending") : t("send")}
                         </Button>
                       </div>
                     </div>
@@ -775,11 +780,11 @@ export function InboxWorkspace({
       <Modal
         isOpen={isSavedRepliesOpen}
         onClose={() => setIsSavedRepliesOpen(false)}
-        title="Saved replies"
+        title={t("savedReplies")}
       >
         <div className="space-y-4">
           <Input
-            placeholder="Search saved replies"
+            placeholder={t("searchSavedReplies")}
             value={savedReplySearch}
             onChange={(event) => setSavedReplySearch(event.target.value)}
           />
@@ -787,13 +792,13 @@ export function InboxWorkspace({
           {isSavedRepliesLoading ? (
             <div className="flex items-center justify-center py-8 text-sm text-slate-500 dark:text-slate-400">
               <Spinner className="mr-2 text-slate-400 dark:text-slate-500" />
-              Loading saved replies...
+              {t("loadingSavedReplies")}
             </div>
           ) : savedRepliesError ? (
             <Alert tone="error">{savedRepliesError}</Alert>
           ) : visibleSavedReplies.length === 0 ? (
             <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
-              No saved replies match your search.
+              {t("savedRepliesEmpty")}
             </div>
           ) : (
             <div className="space-y-3">
@@ -826,8 +831,6 @@ export function InboxWorkspace({
     </main>
   );
 }
-
-
 
 
 

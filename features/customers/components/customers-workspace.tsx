@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useState } from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
@@ -9,6 +10,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { Spinner } from "@/components/ui/spinner";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Toast } from "@/components/ui/toast";
+import { Dropdown } from "@/components/ui/dropdown";
 import { classNames } from "@/lib/class-names";
 import { ApiError } from "@/lib/http/api-error";
 import {
@@ -35,14 +37,11 @@ const channelClasses = {
   Telegram: "bg-sky-100 text-sky-700",
 };
 
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
 export function CustomersWorkspace() {
+  const format = useFormatter();
+  const t = useTranslations("customers");
+  const tCommon = useTranslations("common");
+  const formatDateTime = (value: string) => format.dateTime(new Date(value), { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Bangkok" });
   const [customers, setCustomers] = useState<CustomerSummary[]>([]);
   const [filters, setFilters] = useState<CustomerListFilters>({
     agents: [],
@@ -110,7 +109,7 @@ export function CustomersWorkspace() {
         setErrorMessage(
           error instanceof ApiError
             ? error.message
-            : "We couldn't load the customer directory.",
+            : tCommon("error"),
         );
       } finally {
         if (isMounted) {
@@ -124,7 +123,7 @@ export function CustomersWorkspace() {
     return () => {
       isMounted = false;
     };
-  }, [query]);
+  }, [query, tCommon]);
 
   useEffect(() => {
     if (!toastMessage) {
@@ -191,7 +190,7 @@ export function CustomersWorkspace() {
       setDrawerTags(nextCustomer.tags);
       setNoteDraft("");
       setToastTone("success");
-      setToastMessage("Customer details saved");
+      setToastMessage(t("updated"));
       setCustomers((current) =>
         current.map((customer) =>
           customer.id === nextCustomer.id
@@ -251,17 +250,16 @@ export function CustomersWorkspace() {
             <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
               <div className="space-y-2">
                 <h2 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-slate-100">
-                  Customer directory
+                  {t("title")}
                 </h2>
                 <p className="max-w-2xl text-sm text-slate-600 dark:text-slate-400">
-                  Search contacts, filter by active ownership, and jump back into the
-                  Inbox thread when you need the full context.
+                  {t("description")}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
                   <span className="font-semibold text-slate-950 dark:text-slate-100">{totalCustomers}</span>{" "}
-                  customers
+                  {t("count", { count: totalCustomers })}
                 </div>
                 <Button
                   className="w-auto"
@@ -269,7 +267,7 @@ export function CustomersWorkspace() {
                   onClick={clearFilters}
                   variant="secondary"
                 >
-                  Clear filters
+                  {tCommon("clearFilters")}
                 </Button>
               </div>
             </div>
@@ -277,7 +275,7 @@ export function CustomersWorkspace() {
             <div className="mt-5 grid gap-3 xl:grid-cols-[minmax(0,1.6fr)_repeat(4,minmax(0,1fr))]">
               <Input
                 data-testid="customer-search"
-                placeholder="Search by name, email, or phone"
+                placeholder={t("search")}
                 value={searchTerm}
                 onChange={(event) => {
                   setSearchTerm(event.target.value);
@@ -285,7 +283,7 @@ export function CustomersWorkspace() {
                 }}
               />
               <FilterSelect
-                label="Channel"
+                label={t("channel")}
                 value={channelFilter}
                 onChange={(value) => {
                   setChannelFilter(value as InboxChannel | "all");
@@ -297,7 +295,7 @@ export function CustomersWorkspace() {
                 }))}
               />
               <FilterSelect
-                label="Tag"
+                label={t("tag")}
                 value={tagFilter || "all"}
                 onChange={(value) => {
                   setTagFilter(value === "all" ? "" : value);
@@ -306,7 +304,7 @@ export function CustomersWorkspace() {
                 options={filters.tags.map((tag) => ({ label: tag, value: tag }))}
               />
               <FilterSelect
-                label="Assigned agent"
+                label={t("agent")}
                 value={agentFilter || "all"}
                 onChange={(value) => {
                   setAgentFilter(value === "all" ? "" : value);
@@ -315,7 +313,7 @@ export function CustomersWorkspace() {
                 options={filters.agents}
               />
               <FilterSelect
-                label="Status"
+                label={t("status")}
                 value={statusFilter}
                 onChange={(value) => {
                   setStatusFilter(value as ThreadStatus | "all");
@@ -333,29 +331,29 @@ export function CustomersWorkspace() {
             {isLoading ? (
               <div className="flex h-full min-h-[24rem] items-center justify-center text-sm text-slate-500 dark:text-slate-400">
                 <Spinner className="mr-2 text-slate-400 dark:text-slate-500" />
-                Loading customers...
+                {t("loading")}
               </div>
             ) : errorMessage ? (
               <div className="p-6">
                 <ErrorState
-                  actionLabel="Retry"
+                  actionLabel={tCommon("retry")}
                   description={errorMessage}
                   onAction={() => setPage((current) => current)}
-                  title="Customer directory unavailable"
+                  title={t("noResultsTitle")}
                 />
               </div>
             ) : customers.length === 0 && hasActiveFilters ? (
               <div className="p-6">
                 <EmptyState
-                  description="Try adjusting the search or clearing one of the active filters."
-                  title="No customers match your search."
+                  description={t("noResults")}
+                  title={t("noResultsTitle")}
                 />
               </div>
             ) : customers.length === 0 ? (
               <div className="p-6">
                 <EmptyState
-                  description="Once conversations and contacts arrive, they will appear here."
-                  title="No customers yet"
+                  description={t("empty")}
+                  title={t("emptyTitle")}
                 />
               </div>
             ) : (
@@ -364,11 +362,11 @@ export function CustomersWorkspace() {
                   <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
                     <thead className="bg-slate-50 dark:bg-slate-900">
                       <tr className="text-left text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                        <th className="px-4 py-3 font-semibold">Customer</th>
-                        <th className="px-4 py-3 font-semibold">Channels</th>
-                        <th className="px-4 py-3 font-semibold">Assigned</th>
-                        <th className="px-4 py-3 font-semibold">Status</th>
-                        <th className="px-4 py-3 font-semibold">Last interaction</th>
+                        <th className="px-4 py-3 font-semibold">{t("title")}</th>
+                        <th className="px-4 py-3 font-semibold">{t("channels")}</th>
+                        <th className="px-4 py-3 font-semibold">{t("agent")}</th>
+                        <th className="px-4 py-3 font-semibold">{t("status")}</th>
+                        <th className="px-4 py-3 font-semibold">{t("lastInteraction", { date: "" })}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950">
@@ -422,7 +420,7 @@ export function CustomersWorkspace() {
                           <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
                             <p>{customer.assignedAgent}</p>
                             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                              {customer.unreadCount} unread
+                              {t("unread", { count: customer.unreadCount })}
                             </p>
                           </td>
                           <td className="px-4 py-3">
@@ -498,7 +496,7 @@ export function CustomersWorkspace() {
 
                 <div className="flex flex-col gap-4 border-t border-slate-200 pt-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-slate-500 dark:text-slate-400">
-                    Showing page {page} of {totalPages}
+                    {tCommon("pageOf", { page, total: totalPages })}
                   </p>
                   <Pagination
                     onPageChange={setPage}
@@ -535,7 +533,7 @@ export function CustomersWorkspace() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 backdrop-blur-sm">
           <div className="rounded-2xl bg-white px-5 py-4 text-sm text-slate-600 shadow-lg dark:bg-slate-950 dark:text-slate-300">
             <Spinner className="mr-2 inline-flex text-slate-400" />
-            Loading customer details...
+            {t("loading")}
           </div>
         </div>
       ) : null}
@@ -544,7 +542,7 @@ export function CustomersWorkspace() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-[1.75rem] bg-white p-5 shadow-lg dark:bg-slate-950">
             <ErrorState
-              actionLabel="Retry"
+              actionLabel={tCommon("retry")}
               description={drawerError}
               onAction={() => void openCustomer(selectedCustomerId)}
               title="Customer details unavailable"
@@ -567,6 +565,7 @@ type FilterSelectProps = {
 
 function FilterSelect({ label, onChange, options, value }: FilterSelectProps) {
   const id = useId();
+  const t = useTranslations("common");
 
   return (
     <div className="space-y-2">
@@ -576,20 +575,13 @@ function FilterSelect({ label, onChange, options, value }: FilterSelectProps) {
       <label className="sr-only" htmlFor={id}>
         {label}
       </label>
-      <select
+      <Dropdown
         id={id}
-        aria-label={label}
-        className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-slate-950 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-cyan-500 dark:focus:ring-slate-800"
+        ariaLabel={label}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        <option value="all">All</option>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+        onChange={onChange}
+        options={[{ label: t("all"), value: "all" }, ...options]}
+      />
     </div>
   );
 }

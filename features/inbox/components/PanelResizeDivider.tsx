@@ -1,4 +1,5 @@
 import { classNames } from '@/lib/class-names';
+import { useTranslations } from "next-intl";
 import { LEFT_PANEL_MAX, LEFT_PANEL_MIN, PanelSide, RIGHT_PANEL_MAX, RIGHT_PANEL_MIN } from '../types/inbox';
 
 import {
@@ -24,12 +25,13 @@ export default function PanelResizeDivider({
   onPointerMove,
   onPointerEnd,
 }: PanelResizeDividerProps) {
+  const t = useTranslations("inbox");
   const isLeft = side === "left";
 
   return (
     <div
       role="separator"
-      aria-label={`Resize ${isLeft ? "conversation list" : "customer details"}`}
+      aria-label={isLeft ? t("resizeConversation") : t("resizeCustomer")}
       aria-orientation="vertical"
       aria-valuemin={isLeft ? LEFT_PANEL_MIN : RIGHT_PANEL_MIN}
       aria-valuemax={isLeft ? LEFT_PANEL_MAX : RIGHT_PANEL_MAX}

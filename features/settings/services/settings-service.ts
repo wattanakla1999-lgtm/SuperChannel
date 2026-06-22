@@ -12,7 +12,16 @@ import type {
   SettingsResponse,
   WorkspaceProfileInput,
   WorkspaceProfileSettings,
+  AppLocale,
 } from "../types/settings";
+
+export async function updateLocale(locale: AppLocale) {
+  const response = await apiClient.patch<{ locale: AppLocale }>(
+    "/api/settings/locale",
+    { locale },
+  );
+  return response.data.locale;
+}
 
 export async function getSettings() {
   const response = await apiClient.get<SettingsResponse>("/api/settings");

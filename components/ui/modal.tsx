@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { classNames } from "@/lib/class-names";
+import { useTranslations } from "next-intl";
 
 type ModalProps = {
   children: ReactNode;
@@ -9,6 +10,7 @@ type ModalProps = {
 };
 
 export function Modal({ children, isOpen, onClose, title }: ModalProps) {
+  const t = useTranslations("common");
   if (!isOpen) {
     return null;
   }
@@ -24,7 +26,7 @@ export function Modal({ children, isOpen, onClose, title }: ModalProps) {
               className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
               onClick={onClose}
             >
-              Close
+              {t("close")}
             </button>
           </div>
           <div

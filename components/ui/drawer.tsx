@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTranslations } from "next-intl";
 
 type DrawerProps = {
   children: ReactNode;
@@ -8,6 +9,7 @@ type DrawerProps = {
 };
 
 export function Drawer({ children, isOpen, onClose, title }: DrawerProps) {
+  const t = useTranslations("common");
   if (!isOpen) {
     return null;
   }
@@ -23,7 +25,7 @@ export function Drawer({ children, isOpen, onClose, title }: DrawerProps) {
               className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
               onClick={onClose}
             >
-              Close
+              {t("close")}
             </button>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6 sm:py-6">

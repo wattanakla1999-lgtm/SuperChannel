@@ -1,8 +1,10 @@
 import { classNames } from "@/lib/class-names";
 import { ConversationMessage } from "../types/inbox";
-import { formatTimestamp } from "../utils/format";
+import { useFormatter, useTranslations } from "next-intl";
 
 export default function MessageBubble({ message }: { message: ConversationMessage }) {
+  const format = useFormatter();
+  const t = useTranslations("inbox");
   const isOutbound = message.direction === "outbound";
 
   return (
@@ -17,12 +19,12 @@ export default function MessageBubble({ message }: { message: ConversationMessag
       >
         <div className="mb-1 flex items-center gap-2 text-xs opacity-70">
           <span>{message.senderName}</span>
-          <span>{formatTimestamp(message.createdAt)}</span>
+          <span>{format.dateTime(new Date(message.createdAt), { day: "numeric", hour: "numeric", minute: "2-digit", month: "short", timeZone: "Asia/Bangkok" })}</span>
         </div>
         {message.type === "image" ? (
           <div className="space-y-3">
             <div className="rounded-2xl bg-gradient-to-br from-pink-200 via-orange-100 to-amber-100 p-6 text-sm font-medium text-slate-800">
-              Image attachment preview
+              {t("imagePreview")}
             </div>
             <p>{message.body}</p>
           </div>

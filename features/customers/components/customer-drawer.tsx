@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { classNames } from "@/lib/class-names";
 import type { CustomerDetail } from "../types/customers";
+import { useFormatter, useTranslations } from "next-intl";
 
 const channelClasses = {
   Facebook: "bg-blue-100 text-blue-700",
@@ -27,13 +28,6 @@ type CustomerDrawerProps = {
   onToggleTag: (tag: string) => void;
 };
 
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
 export function CustomerDrawer({
   availableTags,
   customer,
@@ -46,8 +40,11 @@ export function CustomerDrawer({
   onSave,
   onToggleTag,
 }: CustomerDrawerProps) {
+  const format = useFormatter();
+  const t = useTranslations("customers");
+  const formatDateTime = (value: string) => format.dateTime(new Date(value), { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Bangkok" });
   return (
-    <Drawer isOpen={isOpen} onClose={onClose} title={customer?.name ?? "Customer"}>
+    <Drawer isOpen={isOpen} onClose={onClose} title={customer?.name ?? t("title")}>
       {customer ? (
         <div data-testid="customer-drawer" className="space-y-6">
           <section className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900">
@@ -61,29 +58,29 @@ export function CustomerDrawer({
                   <StatusBadge tone={customer.status}>{customer.status}</StatusBadge>
                   {customer.unreadCount > 0 ? (
                     <span className="rounded-full bg-slate-950 px-2 py-1 text-[11px] font-semibold text-white">
-                      {customer.unreadCount} unread
+                      {t("unread", { count: customer.unreadCount })}
                     </span>
                   ) : null}
                 </div>
                 <p className="text-sm text-slate-600 dark:text-slate-400">{customer.location}</p>
                 <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Last interaction {formatDateTime(customer.lastInteractionAt)}
+                  {t("lastInteraction", { date: formatDateTime(customer.lastInteractionAt) })}
                 </p>
               </div>
             </div>
           </section>
 
           <section className="grid gap-4 lg:grid-cols-2">
-            <DetailCard label="Email" value={customer.email} />
-            <DetailCard label="Phone" value={customer.phone} />
-            <DetailCard label="Assigned agent" value={customer.assignedAgent} />
-            <DetailCard label="Current summary" value={customer.notes} />
+            <DetailCard label={t("contact")} value={customer.email} />
+            <DetailCard label={t("contact")} value={customer.phone} />
+            <DetailCard label={t("agent")} value={customer.assignedAgent} />
+            <DetailCard label={t("notes")} value={customer.notes} />
           </section>
 
           <section className="space-y-3 rounded-[1.5rem] border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
             <div>
               <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                Connected channels
+                {t("channels")}
               </h3>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                 Mock channel identities shared with the Inbox profile.
@@ -115,7 +112,7 @@ export function CustomerDrawer({
           <section className="space-y-3 rounded-[1.5rem] border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
             <div>
               <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                Tags
+                {t("tag")}
               </h3>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                 Toggle the mock tags you want to keep on this customer.
@@ -147,7 +144,7 @@ export function CustomerDrawer({
           <section className="space-y-3 rounded-[1.5rem] border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
             <div>
               <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                Internal note
+                {t("notes")}
               </h3>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                 Save a new note and it will become the current customer summary.
@@ -156,7 +153,7 @@ export function CustomerDrawer({
             <textarea
               data-testid="customer-notes-field"
               className="min-h-32 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-cyan-500 dark:focus:ring-slate-800"
-              placeholder="Add an internal note for the next teammate..."
+              placeholder={t("notesPlaceholder")}
               value={noteDraft}
               onChange={(event) => onNoteDraftChange(event.target.value)}
             />
@@ -181,7 +178,7 @@ export function CustomerDrawer({
           <section className="space-y-3 rounded-[1.5rem] border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
             <div>
               <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                Recent conversation timeline
+                {t("recent")}
               </h3>
             </div>
             <div className="space-y-3">
@@ -218,14 +215,14 @@ export function CustomerDrawer({
               onClick={onOpenConversation}
               variant="secondary"
             >
-              Open conversation
+              {t("openConversation")}
             </Button>
             <Button
               data-testid="save-customer-button"
               loading={isSaving}
               onClick={onSave}
             >
-              Save customer
+              {t("save")}
             </Button>
           </div>
         </div>

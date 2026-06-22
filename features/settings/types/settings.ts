@@ -1,6 +1,9 @@
 import type { ThreadStatus } from "@/features/inbox/types/inbox";
 import type { TeamOption } from "@/features/team/types/team";
 
+export const appLocales = ["en", "th"] as const;
+export type AppLocale = (typeof appLocales)[number];
+
 export type SettingsSection =
   | "workspace-profile"
   | "business-hours"
@@ -12,7 +15,7 @@ export type SettingsSection =
 export type WorkspaceProfileSettings = {
   businessName: string;
   email: string;
-  language: string;
+  language: AppLocale;
   logoPreview: string;
   phone: string;
   timezone: string;
@@ -94,4 +97,3 @@ export type InboxPreferencesInput = InboxPreferencesSettings;
 export type NotificationsInput = NotificationsSettings;
 
 export type SavedReplyInput = Omit<SavedReply, "id" | "updatedAt">;
-

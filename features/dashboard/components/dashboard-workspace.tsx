@@ -13,11 +13,14 @@ import {
   YAxis,
 } from "recharts";
 import { useEffect, useMemo, useState } from "react";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Spinner } from "@/components/ui/spinner";
+import { Dropdown } from "@/components/ui/dropdown";
+import { DatePicker } from "@/components/ui/date-picker";
 import { ApiError } from "@/lib/http/api-error";
 import {
   getDashboardAgents,
@@ -33,21 +36,16 @@ import type {
   DashboardTrendPoint,
 } from "../types/dashboard";
 
-const dateRangeOptions: Array<{ label: string; value: DashboardDateRange }> = [
-  { label: "Today", value: "today" },
-  { label: "Last 7 days", value: "last7" },
-  { label: "Last 30 days", value: "last30" },
-  { label: "Custom", value: "custom" },
-];
+const dateRangeOptions: DashboardDateRange[] = ["today", "last7", "last30", "custom"];
 
 const chartPalette = ["#06b6d4", "#0f172a", "#14b8a6", "#f59e0b", "#ec4899"];
-
-function formatLastUpdated(value: string) {
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
+const kpiTranslationKeys = {
+  averageFirstResponseMinutes: "averageResponse",
+  openConversations: "openConversations",
+  resolvedConversations: "resolvedConversations",
+  slaCompliancePercent: "slaCompliance",
+  totalConversations: "totalConversations",
+} as const;
 
 function isForbidden(error: unknown) {
   return error instanceof ApiError && error.status === 403;
@@ -63,6 +61,16 @@ function buildInitialQuery(): DashboardQuery {
 }
 
 export function DashboardWorkspace() {
+  const locale = useLocale();
+  const format = useFormatter();
+  const t = useTranslations("dashboard");
+  const tCommon = useTranslations("common");
+  const formatMetric = (value: number | null, suffix: "%" | "min") => {
+    if (value === null) return tCommon("noData");
+    return suffix === "%"
+      ? format.number(value / 100, { style: "percent", maximumFractionDigits: 0 })
+      : t("minutes", { value: format.number(value, { maximumFractionDigits: 1 }) });
+  };
   const [query, setQuery] = useState<DashboardQuery>(buildInitialQuery);
   const [overview, setOverview] = useState<DashboardOverview | null>(null);
   const [charts, setCharts] = useState<{
@@ -106,7 +114,7 @@ export function DashboardWorkspace() {
         setErrorMessage(
           error instanceof ApiError
             ? error.message
-            : "We couldn't load the dashboard right now.",
+            : t("error"),
         );
       } finally {
         if (isMounted) {
@@ -120,7 +128,7 @@ export function DashboardWorkspace() {
     return () => {
       isMounted = false;
     };
-  }, [query]);
+  }, [query, t]);
 
   const appliedFilters = overview?.appliedFilters;
   const filterOptions = overview?.filters;
@@ -166,17 +174,16 @@ export function DashboardWorkspace() {
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div className="space-y-2">
               <h2 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-slate-100">
-                Analytics dashboard
+                {t("title")}
               </h2>
               <p className="max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-400">
-                Monitor conversation health, SLA performance, and agent workload
-                across the shared mock workspace data.
+                {t("description")}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
               {overview ? (
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-                  Last updated {formatLastUpdated(overview.lastUpdatedAt)}
+                  {t("lastUpdated", { date: format.dateTime(new Date(overview.lastUpdatedAt), { dateStyle: "medium", timeStyle: "short", timeZone: overview.workspace.timezone }) })}
                 </div>
               ) : null}
               <Button
@@ -184,7 +191,7 @@ export function DashboardWorkspace() {
                 onClick={() => setQuery((current) => ({ ...current }))}
                 variant="secondary"
               >
-                Refresh
+                {tCommon("refresh")}
               </Button>
             </div>
           </div>
@@ -206,117 +213,86 @@ export function DashboardWorkspace() {
           className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:p-5"
         >
           <div className="grid gap-3 xl:grid-cols-[180px_repeat(4,minmax(0,1fr))_auto]">
-            <FilterField label="Date range" testId="dashboard-date-range">
-              <select
-                aria-label="Date range"
-                className={selectClasses}
+            <FilterField label={t("dateRange")} testId="dashboard-date-range">
+              <Dropdown
+                ariaLabel={t("dateRange")}
                 value={query.dateRange ?? "last7"}
-                onChange={(event) =>
+                onChange={(value) =>
                   setQuery((current) => ({
                     ...current,
-                    dateRange: event.target.value as DashboardDateRange,
+                    dateRange: value as DashboardDateRange,
                   }))
                 }
-              >
-                {dateRangeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                options={dateRangeOptions.map((option) => ({ label: t(option), value: option }))}
+              />
             </FilterField>
 
-            <FilterField label="Channel">
-              <select
-                aria-label="Channel"
-                className={selectClasses}
+            <FilterField label={t("channel")}>
+              <Dropdown
+                ariaLabel={t("channel")}
                 value={query.channel ?? "all"}
-                onChange={(event) =>
+                onChange={(value) =>
                   setQuery((current) => ({
                     ...current,
-                    channel: event.target.value as DashboardQuery["channel"],
+                    channel: value as DashboardQuery["channel"],
                   }))
                 }
-              >
-                <option value="all">All channels</option>
-                {(filterOptions?.channels ?? []).map((channel) => (
-                  <option key={channel} value={channel}>
-                    {channel}
-                  </option>
-                ))}
-              </select>
+                options={[{ label: t("allChannels"), value: "all" }, ...(filterOptions?.channels ?? []).map((channel) => ({ label: channel, value: channel }))]}
+              />
             </FilterField>
 
-            <FilterField label="Team">
-              <select
-                aria-label="Team"
-                className={selectClasses}
+            <FilterField label={t("team")}>
+              <Dropdown
+                ariaLabel={t("team")}
                 disabled={isAgentScope}
                 value={appliedFilters?.team ?? query.team ?? "all"}
-                onChange={(event) =>
+                onChange={(value) =>
                   setQuery((current) => ({
                     ...current,
-                    team: event.target.value,
+                    team: value,
                   }))
                 }
-              >
-                <option value="all">All teams</option>
-                {(filterOptions?.teams ?? []).map((team) => (
-                  <option key={team} value={team}>
-                    {team}
-                  </option>
-                ))}
-              </select>
+                options={[{ label: t("allTeams"), value: "all" }, ...(filterOptions?.teams ?? []).map((team) => ({ label: team, value: team }))]}
+              />
             </FilterField>
 
-            <FilterField label="Agent">
-              <select
-                aria-label="Agent"
-                className={selectClasses}
+            <FilterField label={t("agent")}>
+              <Dropdown
+                ariaLabel={t("agent")}
                 disabled={isAgentScope}
                 value={appliedFilters?.agent ?? query.agent ?? "all"}
-                onChange={(event) =>
+                onChange={(value) =>
                   setQuery((current) => ({
                     ...current,
-                    agent: event.target.value,
+                    agent: value,
                   }))
                 }
-              >
-                <option value="all">All agents</option>
-                {(filterOptions?.agents ?? []).map((agentName) => (
-                  <option key={agentName} value={agentName}>
-                    {agentName}
-                  </option>
-                ))}
-              </select>
+                options={[{ label: t("allAgents"), value: "all" }, ...(filterOptions?.agents ?? []).map((agentName) => ({ label: agentName, value: agentName }))]}
+              />
             </FilterField>
 
             {query.dateRange === "custom" ? (
               <>
                 <FilterField label="Start date">
-                  <input
-                    aria-label="Start date"
-                    className={inputClasses}
-                    type="date"
+                  <DatePicker
+                    ariaLabel="Start date"
                     value={query.startDate ?? ""}
-                    onChange={(event) =>
+                    onChange={(value) =>
                       setQuery((current) => ({
                         ...current,
-                        startDate: event.target.value,
+                        startDate: value,
                       }))
                     }
                   />
                 </FilterField>
                 <FilterField label="End date">
-                  <input
-                    aria-label="End date"
-                    className={inputClasses}
-                    type="date"
+                  <DatePicker
+                    ariaLabel="End date"
                     value={query.endDate ?? ""}
-                    onChange={(event) =>
+                    onChange={(value) =>
                       setQuery((current) => ({
                         ...current,
-                        endDate: event.target.value,
+                        endDate: value,
                       }))
                     }
                   />
@@ -330,7 +306,7 @@ export function DashboardWorkspace() {
           <section className="rounded-[1.75rem] border border-slate-200 bg-white p-10 text-center shadow-sm dark:border-slate-800 dark:bg-slate-950">
             <div className="flex items-center justify-center text-sm text-slate-500 dark:text-slate-400">
               <Spinner className="mr-2 text-slate-400 dark:text-slate-500" />
-              Loading dashboard...
+              {t("loading")}
             </div>
           </section>
         ) : isForbiddenState ? (
@@ -343,18 +319,18 @@ export function DashboardWorkspace() {
         ) : errorMessage ? (
           <section className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
             <ErrorState
-              actionLabel="Retry"
+              actionLabel={tCommon("retry")}
               description={errorMessage}
               onAction={() => setQuery((current) => ({ ...current }))}
               testId="dashboard-retry-button"
-              title="Dashboard unavailable"
+              title={t("errorTitle")}
             />
           </section>
         ) : overview?.isEmpty ? (
           <section className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
             <EmptyState
-              description="Try another date range or filter combination to find matching analytics."
-              title="No dashboard data for this filter set"
+              description={t("empty")}
+              title={t("emptyTitle")}
             />
           </section>
         ) : overview && charts ? (
@@ -363,16 +339,16 @@ export function DashboardWorkspace() {
               data-testid="dashboard-kpis"
               className="grid gap-4 md:grid-cols-2 xl:grid-cols-5"
             >
-              {Object.values(overview.kpis).map((kpi) => (
+              {Object.entries(overview.kpis).map(([key, kpi]) => (
                 <article
                   key={kpi.label}
                   className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950"
                 >
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                    {kpi.label}
+                    {t(kpiTranslationKeys[key as keyof typeof kpiTranslationKeys])}
                   </p>
                   <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 dark:text-slate-100">
-                    {kpi.valueDisplay}
+                    {locale === "en" ? kpi.valueDisplay : key === "averageFirstResponseMinutes" ? formatMetric(kpi.value, "min") : key === "slaCompliancePercent" ? formatMetric(kpi.value, "%") : kpi.value === null ? tCommon("noData") : format.number(kpi.value)}
                   </p>
                 </article>
               ))}
@@ -382,7 +358,7 @@ export function DashboardWorkspace() {
               <ChartCard
                 summary={trendSummary}
                 testId="conversation-trend-chart"
-                title="Conversation trend"
+                title={t("conversationTrend")}
               >
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart data={charts.conversationTrend}>
@@ -398,7 +374,7 @@ export function DashboardWorkspace() {
               <ChartCard
                 summary={channelSummary}
                 testId="channel-distribution-chart"
-                title="Channel distribution"
+                title={t("channelDistribution")}
               >
                 <ResponsiveContainer width="100%" height={260}>
                   <PieChart>
@@ -423,7 +399,7 @@ export function DashboardWorkspace() {
             </section>
 
             <section className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
-              <ChartCard summary={slaSummary} testId="sla-chart" title="SLA met vs breached">
+              <ChartCard summary={slaSummary} testId="sla-chart" title={t("slaPerformance")}>
                 <ResponsiveContainer width="100%" height={240}>
                   <BarChart data={charts.slaDistribution}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" />
@@ -448,7 +424,7 @@ export function DashboardWorkspace() {
               >
                 <div className="mb-4">
                   <h3 className="text-lg font-semibold text-slate-950 dark:text-slate-100">
-                    Agent performance
+                    {t("agentPerformance")}
                   </h3>
                   <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                     Assigned, resolved, response speed, SLA compliance, and current workload.
@@ -459,12 +435,12 @@ export function DashboardWorkspace() {
                   <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
                     <thead className="bg-slate-50 dark:bg-slate-900">
                       <tr className="text-left text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                        <th className="px-4 py-3 font-semibold">Agent</th>
-                        <th className="px-4 py-3 font-semibold">Assigned</th>
-                        <th className="px-4 py-3 font-semibold">Resolved</th>
-                        <th className="px-4 py-3 font-semibold">Avg first response</th>
+                        <th className="px-4 py-3 font-semibold">{t("agent")}</th>
+                        <th className="px-4 py-3 font-semibold">{t("assigned")}</th>
+                        <th className="px-4 py-3 font-semibold">{t("resolved")}</th>
+                        <th className="px-4 py-3 font-semibold">{t("averageResponse")}</th>
                         <th className="px-4 py-3 font-semibold">SLA</th>
-                        <th className="px-4 py-3 font-semibold">Workload</th>
+                        <th className="px-4 py-3 font-semibold">{t("workload")}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950">
@@ -509,9 +485,9 @@ export function DashboardWorkspace() {
                         </span>
                       </div>
                       <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-slate-700 dark:text-slate-300">
-                        <MetricTile label="Assigned" value={String(agent.assignedCount)} />
-                        <MetricTile label="Resolved" value={String(agent.resolvedCount)} />
-                        <MetricTile label="Avg response" value={formatMetric(agent.averageFirstResponseMinutes, "min")} />
+                        <MetricTile label={t("assigned")} value={format.number(agent.assignedCount)} />
+                        <MetricTile label={t("resolved")} value={format.number(agent.resolvedCount)} />
+                        <MetricTile label={t("averageResponse")} value={formatMetric(agent.averageFirstResponseMinutes, "min")} />
                         <MetricTile label="SLA" value={formatMetric(agent.slaCompliancePercent, "%")} />
                       </div>
                     </article>
@@ -560,12 +536,12 @@ function FilterField({
   testId?: string;
 }) {
   return (
-    <label className="space-y-2" data-testid={testId}>
-      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+    <div className="space-y-2" data-testid={testId}>
+      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
         {label}
-      </span>
+      </div>
       {children}
-    </label>
+    </div>
   );
 }
 
@@ -581,17 +557,3 @@ function MetricTile({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-
-function formatMetric(value: number | null, suffix: "%" | "min") {
-  if (value === null) {
-    return "No data";
-  }
-
-  return suffix === "%" ? `${Math.round(value)}%` : `${value.toFixed(1)} min`;
-}
-
-const selectClasses =
-  "h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-slate-950 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-cyan-500 dark:focus:ring-slate-800 disabled:cursor-not-allowed disabled:bg-slate-100 dark:disabled:bg-slate-800";
-
-const inputClasses =
-  "h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-slate-950 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-cyan-500 dark:focus:ring-slate-800";

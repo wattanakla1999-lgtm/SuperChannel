@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
@@ -9,6 +10,7 @@ import { Modal } from "@/components/ui/modal";
 import { Spinner } from "@/components/ui/spinner";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Toast } from "@/components/ui/toast";
+import { Dropdown } from "@/components/ui/dropdown";
 import { classNames } from "@/lib/class-names";
 import { ApiError } from "@/lib/http/api-error";
 import {
@@ -24,13 +26,8 @@ import type {
   IntegrationStatus,
 } from "../types/integrations";
 
-const statusOptions: Array<{ label: string; value: IntegrationStatus | "all" }> = [
-  { label: "All statuses", value: "all" },
-  { label: "Connected", value: "connected" },
-  { label: "Disconnected", value: "disconnected" },
-  { label: "Expired", value: "expired" },
-  { label: "Error", value: "error" },
-  { label: "Coming soon", value: "coming_soon" },
+const statusOptions: Array<IntegrationStatus | "all"> = [
+  "all", "connected", "disconnected", "expired", "error", "coming_soon",
 ];
 
 const providerAccents: Record<IntegrationProvider, string> = {
@@ -45,18 +42,10 @@ const providerAccents: Record<IntegrationProvider, string> = {
   x: "bg-zinc-200 text-zinc-800",
 };
 
-function formatCheckedAt(value: string | null) {
-  if (!value) {
-    return "Not checked yet";
-  }
-
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
 export function IntegrationsWorkspace() {
+  const format = useFormatter();
+  const t = useTranslations("integrations");
+  const tCommon = useTranslations("common");
   const [integrations, setIntegrations] = useState<IntegrationRecord[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<IntegrationStatus | "all">(
@@ -101,7 +90,7 @@ export function IntegrationsWorkspace() {
         setErrorMessage(
           error instanceof ApiError
             ? error.message
-            : "We couldn't load integrations right now.",
+            : tCommon("error"),
         );
       } finally {
         if (isMounted) {
@@ -115,7 +104,7 @@ export function IntegrationsWorkspace() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [tCommon]);
 
   useEffect(() => {
     if (!toastMessage) {
@@ -256,11 +245,10 @@ export function IntegrationsWorkspace() {
           <section className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:p-6">
             <div className="space-y-2">
               <h2 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-slate-100">
-                Integration hub
+                {t("title")}
               </h2>
               <p className="max-w-3xl text-sm leading-6 text-slate-500 dark:text-slate-400">
-                Review connected channels, recover expired or failing providers,
-                and simulate connection health checks from one responsive hub.
+                {t("description")}
               </p>
             </div>
           </section>
@@ -269,26 +257,17 @@ export function IntegrationsWorkspace() {
             <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
               <Input
                 data-testid="integration-search"
-                placeholder="Search integrations"
+                placeholder={t("search")}
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
               />
-              <select
-                data-testid="integration-status-filter"
-                className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-950 outline-none transition focus-visible:border-slate-400 focus-visible:ring-2 focus-visible:ring-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus-visible:border-cyan-500 dark:focus-visible:ring-slate-800"
+              <Dropdown
+                testId="integration-status-filter"
+                ariaLabel={t("allStatuses")}
                 value={statusFilter}
-                onChange={(event) =>
-                  setStatusFilter(
-                    event.target.value as IntegrationStatus | "all",
-                  )
-                }
-              >
-                {statusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => setStatusFilter(value as IntegrationStatus | "all")}
+                options={statusOptions.map((option) => ({ label: option === "all" ? t("allStatuses") : t(option === "coming_soon" ? "comingSoon" : option), value: option }))}
+              />
             </div>
           </section>
 
@@ -296,14 +275,14 @@ export function IntegrationsWorkspace() {
             {isLoading ? (
               <div className="flex items-center justify-center py-16 text-sm text-slate-500 dark:text-slate-400">
                 <Spinner className="mr-2 text-slate-400 dark:text-slate-500" />
-                Loading integrations...
+                {t("loading")}
               </div>
             ) : errorMessage ? (
               <ErrorState message={errorMessage} />
             ) : filteredIntegrations.length === 0 ? (
               <EmptyState
-                title="No integrations found"
-                description="Try a different search term or status filter."
+                title={t("emptyTitle")}
+                description={t("empty")}
               />
             ) : (
               <div className="grid gap-4 xl:grid-cols-2">
@@ -340,7 +319,7 @@ export function IntegrationsWorkspace() {
 
                         <div className="flex flex-wrap items-center gap-2">
                           <StatusBadge tone={mapStatusTone(integration.status)}>
-                            {integration.status.replace("_", " ")}
+                            {t(integration.status === "coming_soon" ? "statusComingSoon" : integration.status)}
                           </StatusBadge>
                           {integration.capabilities.map((capability) => (
                             <span
@@ -356,7 +335,7 @@ export function IntegrationsWorkspace() {
                           <p>
                             Account: {integration.accountName ?? "Not connected"}
                           </p>
-                          <p>Last checked: {formatCheckedAt(integration.lastCheckedAt)}</p>
+                          <p>{integration.lastCheckedAt ? t("lastChecked", { date: format.dateTime(new Date(integration.lastCheckedAt), { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Bangkok" }) }) : t("lastChecked", { date: tCommon("noData") })}</p>
                         </div>
                         <p className="text-sm leading-6 text-slate-500 dark:text-slate-400">
                           {integration.permissionsHint}
@@ -364,20 +343,20 @@ export function IntegrationsWorkspace() {
                       </div>
 
                       <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-44">
-                        {renderActions({
-                          integration,
-                          onConnect: () => {
+                        <IntegrationActions
+                          integration={integration}
+                          onConnect={() => {
                             setDialogProvider(integration);
                             setSelectedAccountId(
                               integration.availableAccounts[0]?.id ?? "",
                             );
                             setDialogError(null);
-                          },
-                          onDisconnect: () => setDisconnectProvider(integration),
-                          onReconnect: () => void handleReconnect(integration.id),
-                          onTest: () => void handleTest(integration.id),
-                          pendingProvider,
-                        })}
+                          }}
+                          onDisconnect={() => setDisconnectProvider(integration)}
+                          onReconnect={() => void handleReconnect(integration.id)}
+                          onTest={() => void handleTest(integration.id)}
+                          pendingProvider={pendingProvider}
+                        />
                       </div>
                     </div>
                   </article>
@@ -394,7 +373,7 @@ export function IntegrationsWorkspace() {
           setDialogProvider(null);
           setDialogError(null);
         }}
-        title={`Connect ${dialogProvider?.providerName ?? "provider"}`}
+        title={t("connectTitle", { provider: dialogProvider?.providerName ?? "" })}
       >
         <div data-testid="connection-dialog" className="space-y-6">
           {dialogError ? <ErrorState message={dialogError} /> : null}
@@ -422,18 +401,13 @@ export function IntegrationsWorkspace() {
             <h3 className="text-sm font-semibold text-slate-950 dark:text-slate-100">
               3. Select a mock business account
             </h3>
-            <select
-              className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-950 outline-none transition focus-visible:border-slate-400 focus-visible:ring-2 focus-visible:ring-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus-visible:border-cyan-500 dark:focus-visible:ring-slate-800"
+            <Dropdown
+              ariaLabel={t("connectTitle", { provider: dialogProvider?.providerName ?? "" })}
               value={selectedAccountId}
-              onChange={(event) => setSelectedAccountId(event.target.value)}
+              onChange={setSelectedAccountId}
               disabled={isDialogSubmitting}
-            >
-              {dialogProvider?.availableAccounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.label}
-                </option>
-              ))}
-            </select>
+              options={(dialogProvider?.availableAccounts ?? []).map((account) => ({ label: account.label, value: account.id }))}
+            />
           </section>
 
           <section className="space-y-3">
@@ -453,14 +427,14 @@ export function IntegrationsWorkspace() {
               onClick={() => setDialogProvider(null)}
               disabled={isDialogSubmitting}
             >
-              Cancel
+              {tCommon("cancel")}
             </Button>
             <Button
               className="w-full sm:w-auto"
               loading={isDialogSubmitting}
               onClick={() => void handleConnectSubmit()}
             >
-              Connect and test
+              {t("connectAndTest")}
             </Button>
           </div>
         </div>
@@ -469,12 +443,11 @@ export function IntegrationsWorkspace() {
       <Modal
         isOpen={Boolean(disconnectProvider)}
         onClose={() => setDisconnectProvider(null)}
-        title={`Disconnect ${disconnectProvider?.providerName ?? "provider"}`}
+        title={t("disconnectTitle", { provider: disconnectProvider?.providerName ?? "" })}
       >
         <div className="space-y-5">
           <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
-            Disconnecting this provider will remove the active mock connection
-            and mark it unavailable until you reconnect it again.
+            {t("disconnectDescription")}
           </p>
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
             <Button
@@ -483,7 +456,7 @@ export function IntegrationsWorkspace() {
               onClick={() => setDisconnectProvider(null)}
               disabled={pendingProvider === disconnectProvider?.id}
             >
-              Cancel
+              {tCommon("cancel")}
             </Button>
             <Button
               data-testid="confirm-disconnect-button"
@@ -492,7 +465,7 @@ export function IntegrationsWorkspace() {
               loading={pendingProvider === disconnectProvider?.id}
               onClick={() => void handleDisconnect()}
             >
-              Disconnect
+              {t("disconnect")}
             </Button>
           </div>
         </div>
@@ -518,7 +491,7 @@ function mapStatusTone(status: IntegrationStatus) {
   }
 }
 
-function renderActions({
+function IntegrationActions({
   integration,
   onConnect,
   onDisconnect,
@@ -533,12 +506,14 @@ function renderActions({
   onTest: () => void;
   pendingProvider: IntegrationProvider | null;
 }) {
+  const t = useTranslations("integrations");
+  const tCommon = useTranslations("common");
   const isPending = pendingProvider === integration.id;
 
   if (integration.status === "coming_soon") {
     return (
       <Button variant="secondary" className="w-full" disabled>
-        Coming soon
+        {t("comingSoon")}
       </Button>
     );
   }
@@ -550,7 +525,7 @@ function renderActions({
         className="w-full"
         onClick={onConnect}
       >
-        Connect
+        {t("connect")}
       </Button>
     );
   }
@@ -564,7 +539,7 @@ function renderActions({
           loading={isPending}
           onClick={onReconnect}
         >
-          Reconnect
+          {t("reconnect")}
         </Button>
         <Button
           data-testid={`test-${integration.id}`}
@@ -573,7 +548,7 @@ function renderActions({
           loading={isPending}
           onClick={onTest}
         >
-          Test
+          {t("test")}
         </Button>
       </>
     );
@@ -588,7 +563,7 @@ function renderActions({
           loading={isPending}
           onClick={onReconnect}
         >
-          Retry
+          {t("retry")}
         </Button>
         <Button
           data-testid={`test-${integration.id}`}
@@ -597,7 +572,7 @@ function renderActions({
           loading={isPending}
           onClick={onTest}
         >
-          Test
+          {t("test")}
         </Button>
       </>
     );
@@ -612,14 +587,14 @@ function renderActions({
         loading={isPending}
         onClick={onTest}
       >
-        Test
+        {t("test")}
       </Button>
       <Button
         className="w-full"
         variant="secondary"
         disabled
       >
-        Configure
+        {tCommon("edit")}
       </Button>
       <Button
         data-testid={`disconnect-${integration.id}`}
@@ -627,7 +602,7 @@ function renderActions({
         variant="secondary"
         onClick={onDisconnect}
       >
-        Disconnect
+        {t("disconnect")}
       </Button>
     </>
   );

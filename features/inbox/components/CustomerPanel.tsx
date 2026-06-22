@@ -1,6 +1,7 @@
 import { CustomerOrdersPanel } from "@/features/orders/components/customer-orders-panel";
 import { classNames } from "@/lib/class-names";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { ConversationDetail, ConversationSummary } from "../types/inbox";
 import DetailSection from "./DetailSection";
 
@@ -17,6 +18,8 @@ export default function CustomerPanel({
   isDrawerOpen,
   onCloseDrawer,
 }: CustomerPanelProps) {
+  const t = useTranslations("inbox");
+  const tCommon = useTranslations("common");
   const [activeTab, setActiveTab] = useState<"customer" | "orders">("customer");
 
   const panelBody = (
@@ -28,9 +31,9 @@ export default function CustomerPanel({
       <div className="border-b border-slate-200 p-4 dark:border-slate-800">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-slate-950 dark:text-slate-100">Customer</p>
+            <p className="text-sm font-semibold text-slate-950 dark:text-slate-100">{t("customer")}</p>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Context, ownership, and tags
+              {t("customerContext")}
             </p>
           </div>
           <button
@@ -38,7 +41,7 @@ export default function CustomerPanel({
             className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 dark:border-slate-700 dark:text-slate-300 lg:hidden"
             onClick={onCloseDrawer}
           >
-            Close
+            {tCommon("close")}
           </button>
         </div>
       </div>
@@ -55,7 +58,7 @@ export default function CustomerPanel({
             )}
             onClick={() => setActiveTab("customer")}
           >
-            Customer
+            {t("customerTab")}
           </button>
           <button
             type="button"
@@ -68,14 +71,14 @@ export default function CustomerPanel({
             )}
             onClick={() => setActiveTab("orders")}
           >
-            Orders
+            {t("ordersTab")}
           </button>
         </div>
       </div>
 
       {!activeConversation || !activeCustomer ? (
         <div className="flex min-h-0 flex-1 items-center justify-center p-6 text-center text-sm text-slate-500 dark:text-slate-400">
-          Select a conversation to view customer details.
+          {t("customerEmpty")}
         </div>
       ) : activeTab === "orders" ? (
         <div className="min-h-0 flex-1 overflow-hidden p-4">
@@ -99,15 +102,15 @@ export default function CustomerPanel({
             </div>
           </div>
 
-          <DetailSection label="Assigned agent" value={activeConversation.assignedAgent} />
-          <DetailSection label="Status" value={activeConversation.status} badge />
+          <DetailSection label={t("assignedAgent")} value={activeConversation.assignedAgent} />
+          <DetailSection label={tCommon("status")} value={activeConversation.status} badge />
           <DetailSection
-            label="Tags"
+            label={t("tags")}
             value={activeConversation.tags.join(", ")}
           />
-          <DetailSection label="Email" value={activeCustomer.email} />
-          <DetailSection label="Phone" value={activeCustomer.phone} />
-          <DetailSection label="Notes" value={activeCustomer.notes} />
+          <DetailSection label={t("email")} value={activeCustomer.email} />
+          <DetailSection label={t("phone")} value={activeCustomer.phone} />
+          <DetailSection label={t("notes")} value={activeCustomer.notes} />
         </div>
       )}
     </div>

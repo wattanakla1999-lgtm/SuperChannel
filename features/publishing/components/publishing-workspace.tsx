@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,8 @@ import { Modal } from "@/components/ui/modal";
 import { Spinner } from "@/components/ui/spinner";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Toast } from "@/components/ui/toast";
+import { Dropdown } from "@/components/ui/dropdown";
+import { DatePicker } from "@/components/ui/date-picker";
 import { classNames } from "@/lib/class-names";
 import { ApiError } from "@/lib/http/api-error";
 import { getIntegrations } from "@/features/integrations/services/integration-service";
@@ -25,13 +28,7 @@ import type {
   PublishingStatus,
 } from "../types/publishing";
 
-const tabs: Array<{ label: string; value: PublishingStatus }> = [
-  { label: "All", value: "all" },
-  { label: "Drafts", value: "draft" },
-  { label: "Scheduled", value: "scheduled" },
-  { label: "Published", value: "published" },
-  { label: "Failed", value: "failed" },
-];
+const tabs: PublishingStatus[] = ["all", "draft", "scheduled", "published", "failed"];
 
 const channelOptions: PublishingChannel[] = [
   "Facebook",
@@ -79,6 +76,8 @@ function buildScheduledAt(dateValue: string, timeValue: string) {
 }
 
 export function PublishingWorkspace() {
+  const format = useFormatter();
+  const t = useTranslations("publishing");
   const [posts, setPosts] = useState<PublishingPost[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState<PublishingStatus>("all");
@@ -131,7 +130,7 @@ export function PublishingWorkspace() {
         setErrorMessage(
           error instanceof ApiError
             ? error.message
-            : "We couldn't load the publishing workspace.",
+            : t("noResults"),
         );
       } finally {
         if (isMounted) {
@@ -145,7 +144,7 @@ export function PublishingWorkspace() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     let isMounted = true;
@@ -267,17 +266,17 @@ export function PublishingWorkspace() {
 
   const validateComposer = (submitMode: PublishingCreateInput["submitMode"]) => {
     if (!caption.trim() && !selectedMediaId) {
-      return "Add a caption or media";
+      return t("captionRequired");
     }
 
     if (!selectedChannels.length) {
-      return "Select at least one channel";
+      return t("channelRequired");
     }
 
     if (submitMode === "schedule") {
       const scheduledFor = buildScheduledAt(scheduleDate, scheduleTime);
       if (!scheduledFor || new Date(scheduledFor).getTime() <= Date.now()) {
-        return "Choose a future date and time";
+        return t("futureRequired");
       }
     }
 
@@ -373,11 +372,10 @@ export function PublishingWorkspace() {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="space-y-2">
                 <h2 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-slate-100">
-                  Publishing workspace
+                  {t("title")}
                 </h2>
                 <p className="max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
-                  Draft, schedule, and publish mock channel posts from one queue
-                  while reviewing channel coverage and status at a glance.
+                  {t("description")}
                 </p>
               </div>
               <Button
@@ -388,7 +386,7 @@ export function PublishingWorkspace() {
                   setIsComposerOpen(true);
                 }}
               >
-                Create post
+                {t("create")}
               </Button>
             </div>
           </section>
@@ -398,42 +396,32 @@ export function PublishingWorkspace() {
               <div className="flex flex-wrap gap-2">
                 {tabs.map((tab) => (
                   <button
-                    key={tab.value}
+                    key={tab}
                     type="button"
                     className={classNames(
                       "rounded-full px-3 py-2 text-sm font-medium transition",
-                      activeTab === tab.value
+                      activeTab === tab
                         ? "bg-slate-950 text-white dark:bg-cyan-500 dark:text-slate-950"
                         : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700",
                     )}
-                    onClick={() => setActiveTab(tab.value)}
+                    onClick={() => setActiveTab(tab)}
                   >
-                    {tab.label}
+                    {t(`tabs.${tab}`)}
                   </button>
                 ))}
               </div>
               <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_200px] xl:w-[540px]">
                 <Input
-                  placeholder="Search posts"
+                  placeholder={t("search")}
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                 />
-                <select
-                  className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-950 outline-none transition focus-visible:border-slate-400 focus-visible:ring-2 focus-visible:ring-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus-visible:border-cyan-500 dark:focus-visible:ring-slate-800"
+                <Dropdown
+                  ariaLabel={t("channel")}
                   value={channelFilter}
-                  onChange={(event) =>
-                    setChannelFilter(
-                      event.target.value as PublishingChannel | "all",
-                    )
-                  }
-                >
-                  <option value="all">All channels</option>
-                  {availableChannels.map((channel) => (
-                    <option key={channel} value={channel}>
-                      {channel}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(value) => setChannelFilter(value as PublishingChannel | "all")}
+                  options={[{ label: t("allChannels"), value: "all" }, ...availableChannels.map((channel) => ({ label: channel, value: channel }))]}
+                />
               </div>
             </div>
           </section>
@@ -442,27 +430,27 @@ export function PublishingWorkspace() {
             {isLoading ? (
               <div className="flex items-center justify-center py-16 text-sm text-slate-500 dark:text-slate-400">
                 <Spinner className="mr-2 text-slate-400 dark:text-slate-500" />
-                Loading posts...
+                {t("loading")}
               </div>
             ) : errorMessage ? (
               <ErrorState message={errorMessage} />
             ) : posts.length === 0 ? (
               <EmptyState
-                title="No posts yet"
-                description="Create your first mock post to populate the publishing queue."
+                title={t("emptyTitle")}
+                description={t("empty")}
                 action={
                   <Button
                     className="w-full sm:w-auto"
                     onClick={() => setIsComposerOpen(true)}
                   >
-                    Create post
+                    {t("create")}
                   </Button>
                 }
               />
             ) : filteredPosts.length === 0 ? (
               <EmptyState
-                title="No matching posts"
-                description="Try a different tab, channel filter, or search term."
+                title={t("noResultsTitle")}
+                description={t("noResults")}
               />
             ) : (
               <div data-testid="post-list" className="space-y-3">
@@ -474,7 +462,7 @@ export function PublishingWorkspace() {
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                       <div className="space-y-3">
                         <div className="flex flex-wrap items-center gap-2">
-                          <StatusBadge tone={post.status}>{post.status}</StatusBadge>
+                          <StatusBadge tone={post.status}>{t(`statuses.${post.status}`)}</StatusBadge>
                           {post.channels.map((channel) => (
                             <span
                               key={channel}
@@ -488,7 +476,7 @@ export function PublishingWorkspace() {
                           {post.caption || "Mock media-only post"}
                         </p>
                         <div className="flex flex-wrap gap-4 text-xs text-slate-500 dark:text-slate-400">
-                          <span>{formatDateTime(post.scheduledFor)}</span>
+                          <span>{post.scheduledFor ? format.dateTime(new Date(post.scheduledFor), { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Bangkok" }) : t("publishNow")}</span>
                           <span>Created {formatDateTime(post.createdAt)}</span>
                           {post.media ? <span>Media: {post.media.label}</span> : null}
                         </div>
@@ -501,7 +489,7 @@ export function PublishingWorkspace() {
                             loading={publishingPostId === post.id}
                             onClick={() => handlePublishExisting(post.id)}
                           >
-                            Publish now
+                            {t("publishNow")}
                           </Button>
                         ) : null}
                         {post.status === "scheduled" ? (
@@ -527,7 +515,7 @@ export function PublishingWorkspace() {
       <Modal
         isOpen={isComposerOpen}
         onClose={() => setIsComposerOpen(false)}
-        title="Create post"
+        title={t("composerTitle")}
       >
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_320px]">
           <div className="space-y-6">
@@ -539,7 +527,7 @@ export function PublishingWorkspace() {
                   htmlFor="post-caption-field"
                   className="text-sm font-semibold text-slate-950 dark:text-slate-100"
                 >
-                  Caption
+                  {t("caption")}
                 </label>
                 <span className="text-xs text-slate-500 dark:text-slate-400">{caption.length}/280</span>
               </div>
@@ -547,7 +535,7 @@ export function PublishingWorkspace() {
                 id="post-caption-field"
                 data-testid="post-caption-field"
                 className="min-h-40 w-full rounded-[1.25rem] border border-slate-200 px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus-visible:border-slate-400 focus-visible:ring-2 focus-visible:ring-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus-visible:border-cyan-500 dark:focus-visible:ring-slate-800"
-                placeholder="Write the post caption"
+                placeholder={t("captionPlaceholder")}
                 value={caption}
                 onChange={(event) => setCaption(event.target.value)}
                 disabled={isSubmitting}
@@ -555,7 +543,7 @@ export function PublishingWorkspace() {
             </section>
 
             <section className="space-y-3">
-              <p className="text-sm font-semibold text-slate-950 dark:text-slate-100">Mock media</p>
+              <p className="text-sm font-semibold text-slate-950 dark:text-slate-100">{t("media")}</p>
               <div className="grid gap-3 sm:grid-cols-3">
                 {mockMediaOptions.map((option) => (
                   <button
@@ -589,7 +577,7 @@ export function PublishingWorkspace() {
             </section>
 
             <section className="space-y-3">
-              <p className="text-sm font-semibold text-slate-950 dark:text-slate-100">Channels</p>
+              <p className="text-sm font-semibold text-slate-950 dark:text-slate-100">{t("channels")}</p>
               <div
                 data-testid="channel-selector"
                 className="grid gap-3 sm:grid-cols-2"
@@ -617,7 +605,7 @@ export function PublishingWorkspace() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-slate-950 dark:text-slate-100">
-                    Schedule for later
+                    {t("scheduleLater")}
                   </p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
                     Toggle to publish at a future time.
@@ -636,16 +624,16 @@ export function PublishingWorkspace() {
                   onClick={() => setIsScheduled((current) => !current)}
                   disabled={isSubmitting}
                 >
-                  {isScheduled ? "Scheduled" : "Publish now"}
+                  {isScheduled ? t("tabs.scheduled") : t("publishNow")}
                 </button>
               </div>
               {isScheduled ? (
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <Input
-                    type="date"
+                  <DatePicker
+                    ariaLabel={t("scheduleDate")}
                     value={scheduleDate}
                     min={minimumScheduleDate}
-                    onChange={(event) => setScheduleDate(event.target.value)}
+                    onChange={setScheduleDate}
                     disabled={isSubmitting}
                   />
                   <Input
@@ -661,7 +649,7 @@ export function PublishingWorkspace() {
 
           <aside className="space-y-4">
             <section className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900">
-              <p className="text-sm font-semibold text-slate-950 dark:text-slate-100">Channel preview</p>
+              <p className="text-sm font-semibold text-slate-950 dark:text-slate-100">{t("preview")}</p>
               <div className="mt-4 space-y-3">
                 <div
                   className={classNames(
@@ -708,14 +696,14 @@ export function PublishingWorkspace() {
                 loading={isSubmitting}
                 onClick={() => handleSubmit("draft")}
               >
-                Save draft
+                {t("saveDraft")}
               </Button>
               <Button
                 data-testid="submit-post-button"
                 loading={isSubmitting}
                 onClick={() => handleSubmit(isScheduled ? "schedule" : "publish")}
               >
-                {isScheduled ? "Schedule post" : "Publish post"}
+                {isScheduled ? t("schedule") : t("publish")}
               </Button>
             </div>
           </aside>

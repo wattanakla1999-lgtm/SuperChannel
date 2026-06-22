@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -9,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Spinner } from "@/components/ui/spinner";
 import { Toast } from "@/components/ui/toast";
+import { LanguageSwitcher } from "@/components/ui/language-switcher";
+import { Dropdown } from "@/components/ui/dropdown";
 import { classNames } from "@/lib/class-names";
 import { ApiError } from "@/lib/http/api-error";
 import {
@@ -18,11 +21,13 @@ import {
   getSettings,
   updateBusinessHours,
   updateInboxPreferences,
+  updateLocale,
   updateNotifications,
   updateSavedReply,
   updateWorkspaceProfile,
 } from "../services/settings-service";
 import type {
+  AppLocale,
   BusinessHoursSettings,
   InboxPreferencesSettings,
   NotificationsSettings,
@@ -66,7 +71,14 @@ const sectionDefinitions: Array<{ description: string; id: SettingsSection; labe
   },
 ];
 
-const languages = ["English", "Thai", "Japanese"];
+const sectionTranslationKeys: Record<SettingsSection, "workspace" | "hours" | "inbox" | "replies" | "notifications" | "security"> = {
+  "workspace-profile": "workspace",
+  "business-hours": "hours",
+  "inbox-preferences": "inbox",
+  "saved-replies": "replies",
+  notifications: "notifications",
+  security: "security",
+};
 const conversationStatuses = ["open", "pending", "resolved"] as const;
 
 type ReplyFormState = SavedReplyInput;
@@ -105,6 +117,13 @@ function holidaysFromText(value: string) {
 }
 
 export function SettingsWorkspace() {
+  const locale = useLocale();
+  const t = useTranslations("settings");
+  const tCommon = useTranslations("common");
+  const languageOptions: Array<{ label: string; value: AppLocale }> = [
+    { label: tCommon("english"), value: "en" },
+    { label: tCommon("thai"), value: "th" },
+  ];
   const [activeSection, setActiveSection] = useState<SettingsSection>("workspace-profile");
   const [pendingSection, setPendingSection] = useState<SettingsSection | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -184,7 +203,7 @@ export function SettingsWorkspace() {
         setLoadError(
           error instanceof ApiError
             ? error.message
-            : "We couldn't load workspace settings.",
+            : tCommon("error"),
         );
       } finally {
         if (isMounted) {
@@ -198,7 +217,7 @@ export function SettingsWorkspace() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [tCommon]);
 
   useEffect(() => {
     if (!toastMessage) {
@@ -318,7 +337,7 @@ export function SettingsWorkspace() {
     resetActiveSection();
     setShowResetConfirm(false);
     setToastTone("success");
-    setToastMessage("Unsaved changes cleared");
+    setToastMessage(t("resetDone"));
   };
 
   const handleSaveSection = async () => {
@@ -339,6 +358,11 @@ export function SettingsWorkspace() {
         });
         setWorkspaceProfile(updated);
         setInitialWorkspaceProfile(updated);
+        if (updated.language !== locale) {
+          await updateLocale(updated.language);
+          window.location.reload();
+          return;
+        }
       }
 
       if (activeSection === "business-hours" && businessHours) {
@@ -365,7 +389,7 @@ export function SettingsWorkspace() {
       }
 
       setToastTone("success");
-      setToastMessage("Settings saved");
+      setToastMessage(t("saved"));
     } catch (error) {
       setToastTone("error");
       setToastMessage(
@@ -472,7 +496,7 @@ export function SettingsWorkspace() {
       >
         <div className="flex items-center text-sm text-slate-500">
           <Spinner className="mr-2 text-slate-400" />
-          Loading settings...
+          {t("loading")}
         </div>
       </main>
     );
@@ -482,10 +506,10 @@ export function SettingsWorkspace() {
     return (
       <main data-testid="settings-page" className="px-4 py-6 lg:px-6">
         <ErrorState
-          actionLabel="Retry"
+          actionLabel={tCommon("retry")}
           description={loadError}
           onAction={() => window.location.reload()}
-          title="Settings unavailable"
+          title={t("title")}
         />
       </main>
     );
@@ -501,18 +525,20 @@ export function SettingsWorkspace() {
           <section className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
             <div className="space-y-2">
               <h2 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-slate-100">
-                Workspace settings
+                {t("title")}
               </h2>
               <p className="text-sm text-slate-600 dark:text-slate-400">
-                Manage workspace operations, notifications, and reusable inbox content.
+                {t("description")}
               </p>
+            </div>
+            <div className="mt-4">
+              <LanguageSwitcher />
             </div>
 
             {!canManageSettings && currentUser ? (
               <div className="mt-4">
                 <Alert>
-                  You have read-only access as a {currentUser.role}. Owners and Admins can
-                  update workspace settings.
+                  {t("readOnly")}
                 </Alert>
               </div>
             ) : null}
@@ -530,7 +556,7 @@ export function SettingsWorkspace() {
                   )}
                   onClick={() => handleSectionChange(section.id)}
                 >
-                  <p className="text-sm font-semibold text-slate-950 dark:text-slate-100">{section.label}</p>
+                  <p className="text-sm font-semibold text-slate-950 dark:text-slate-100">{t(`sections.${sectionTranslationKeys[section.id]}`)}</p>
                   <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{section.description}</p>
                 </button>
               ))}
@@ -541,7 +567,7 @@ export function SettingsWorkspace() {
             {isCurrentSectionDirty ? (
               <div className="mb-4">
                 <Alert tone="info">
-                  You have unsaved changes in this section. Save or reset before leaving.
+                  {t("unsaved")}
                 </Alert>
               </div>
             ) : null}
@@ -553,7 +579,7 @@ export function SettingsWorkspace() {
                 onReset={() => setShowResetConfirm(true)}
                 onSave={() => void handleSaveSection()}
                 showActions
-                title="Workspace Profile"
+                title={t("sections.workspace")}
                 isSaving={isSaving}
                 isDirty={isWorkspaceDirty}
               >
@@ -590,7 +616,7 @@ export function SettingsWorkspace() {
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">
-                    <LabeledField label="Business name">
+                    <LabeledField label={t("businessName")}>
                       <Input
                         value={workspaceProfile.businessName}
                         onChange={(event) =>
@@ -603,7 +629,7 @@ export function SettingsWorkspace() {
                         disabled={!canManageSettings}
                       />
                     </LabeledField>
-                    <LabeledField label="Workspace email">
+                    <LabeledField label={t("workspaceEmail")}>
                       <Input
                         type="email"
                         value={workspaceProfile.email}
@@ -615,7 +641,7 @@ export function SettingsWorkspace() {
                         disabled={!canManageSettings}
                       />
                     </LabeledField>
-                    <LabeledField label="Phone">
+                    <LabeledField label={t("phone")}>
                       <Input
                         value={workspaceProfile.phone}
                         onChange={(event) =>
@@ -627,17 +653,17 @@ export function SettingsWorkspace() {
                       />
                     </LabeledField>
                     <SelectField
-                      label="Language"
+                      label={tCommon("language")}
                       value={workspaceProfile.language}
-                      options={languages.map((language) => ({ label: language, value: language }))}
+                      options={languageOptions}
                       disabled={!canManageSettings}
                       onChange={(value) =>
                         setWorkspaceProfile((current) =>
-                          current ? { ...current, language: value } : current,
+                          current ? { ...current, language: value as AppLocale } : current,
                         )
                       }
                     />
-                    <LabeledField label="Timezone">
+                    <LabeledField label={t("timezone")}>
                       <Input
                         value={workspaceProfile.timezone}
                         onChange={(event) =>
@@ -660,7 +686,7 @@ export function SettingsWorkspace() {
                 onReset={() => setShowResetConfirm(true)}
                 onSave={() => void handleSaveSection()}
                 showActions
-                title="Business Hours"
+                title={t("sections.hours")}
                 isSaving={isSaving}
                 isDirty={isBusinessHoursDirty}
               >
@@ -773,13 +799,13 @@ export function SettingsWorkspace() {
                 onReset={() => setShowResetConfirm(true)}
                 onSave={() => void handleSaveSection()}
                 showActions
-                title="Inbox Preferences"
+                title={t("sections.inbox")}
                 isSaving={isSaving}
                 isDirty={isInboxPreferencesDirty}
               >
                 <div className="grid gap-4 md:grid-cols-2">
                   <SelectField
-                    label="Default assignment"
+                    label={t("defaultAssignment")}
                     value={inboxPreferences.defaultAssignment}
                     options={assignmentOptions}
                     disabled={!canManageSettings}
@@ -790,7 +816,7 @@ export function SettingsWorkspace() {
                     }
                   />
                   <SelectField
-                    label="Default conversation status"
+                    label={t("defaultStatus")}
                     value={inboxPreferences.defaultConversationStatus}
                     options={conversationStatuses.map((status) => ({
                       label: status,
@@ -809,7 +835,7 @@ export function SettingsWorkspace() {
                       )
                     }
                   />
-                  <LabeledField label="Auto-close duration (hours)">
+                  <LabeledField label={t("autoClose")}>
                     <Input
                       inputMode="numeric"
                       value={String(inboxPreferences.autoCloseHours)}
@@ -830,7 +856,7 @@ export function SettingsWorkspace() {
                     <ToggleField
                       checked={inboxPreferences.soundEnabled}
                       disabled={!canManageSettings}
-                      label="Sound for new Inbox activity"
+                      label={t("sound")}
                       onChange={(checked) =>
                         setInboxPreferences((current) =>
                           current ? { ...current, soundEnabled: checked } : current,
@@ -840,7 +866,7 @@ export function SettingsWorkspace() {
                     <ToggleField
                       checked={inboxPreferences.showMessagePreview}
                       disabled={!canManageSettings}
-                      label="Show message preview in conversation list"
+                      label={t("messagePreview")}
                       onChange={(checked) =>
                         setInboxPreferences((current) =>
                           current ? { ...current, showMessagePreview: checked } : current,
@@ -856,7 +882,7 @@ export function SettingsWorkspace() {
               <SectionFrame
                 canManageSettings={canManageSettings}
                 description="Manage reusable replies that appear in both Settings and the Inbox composer."
-                title="Saved Replies"
+                title={t("sections.replies")}
               >
                 <div className="space-y-4">
                   <div className="flex flex-col gap-3 sm:flex-row">
@@ -939,7 +965,7 @@ export function SettingsWorkspace() {
                 onReset={() => setShowResetConfirm(true)}
                 onSave={() => void handleSaveSection()}
                 showActions
-                title="Notifications"
+                title={t("sections.notifications")}
                 isSaving={isSaving}
                 isDirty={isNotificationsDirty}
               >
@@ -947,7 +973,7 @@ export function SettingsWorkspace() {
                   <ToggleField
                     checked={notifications.newMessage}
                     disabled={!canManageSettings}
-                    label="New message"
+                    label={t("newMessage")}
                     onChange={(checked) =>
                       setNotifications((current) =>
                         current ? { ...current, newMessage: checked } : current,
@@ -957,7 +983,7 @@ export function SettingsWorkspace() {
                   <ToggleField
                     checked={notifications.assignment}
                     disabled={!canManageSettings}
-                    label="Assignment"
+                    label={t("assignment")}
                     onChange={(checked) =>
                       setNotifications((current) =>
                         current ? { ...current, assignment: checked } : current,
@@ -967,7 +993,7 @@ export function SettingsWorkspace() {
                   <ToggleField
                     checked={notifications.mention}
                     disabled={!canManageSettings}
-                    label="Mention"
+                    label={t("mention")}
                     onChange={(checked) =>
                       setNotifications((current) =>
                         current ? { ...current, mention: checked } : current,
@@ -977,7 +1003,7 @@ export function SettingsWorkspace() {
                   <ToggleField
                     checked={notifications.failedPublishing}
                     disabled={!canManageSettings}
-                    label="Failed publishing"
+                    label={t("failedPublishing")}
                     onChange={(checked) =>
                       setNotifications((current) =>
                         current ? { ...current, failedPublishing: checked } : current,
@@ -987,7 +1013,7 @@ export function SettingsWorkspace() {
                   <ToggleField
                     checked={notifications.expiredConnection}
                     disabled={!canManageSettings}
-                    label="Expired connection"
+                    label={t("expiredConnection")}
                     onChange={(checked) =>
                       setNotifications((current) =>
                         current ? { ...current, expiredConnection: checked } : current,
@@ -997,7 +1023,7 @@ export function SettingsWorkspace() {
                   <ToggleField
                     checked={notifications.desktop}
                     disabled={!canManageSettings}
-                    label="Desktop"
+                    label={t("desktop")}
                     onChange={(checked) =>
                       setNotifications((current) =>
                         current ? { ...current, desktop: checked } : current,
@@ -1007,7 +1033,7 @@ export function SettingsWorkspace() {
                   <ToggleField
                     checked={notifications.email}
                     disabled={!canManageSettings}
-                    label="Email"
+                    label={t("emailNotifications")}
                     onChange={(checked) =>
                       setNotifications((current) =>
                         current ? { ...current, email: checked } : current,
@@ -1017,7 +1043,7 @@ export function SettingsWorkspace() {
                   <ToggleField
                     checked={notifications.sound}
                     disabled={!canManageSettings}
-                    label="Sound"
+                    label={t("sound")}
                     onChange={(checked) =>
                       setNotifications((current) =>
                         current ? { ...current, sound: checked } : current,
@@ -1032,13 +1058,13 @@ export function SettingsWorkspace() {
               <SectionFrame
                 canManageSettings={canManageSettings}
                 description="Review mock session details without exposing credentials, tokens, or real security controls."
-                title="Security"
+                title={t("sections.security")}
               >
                 <div className="grid gap-4 md:grid-cols-2">
-                  <ReadOnlyCard label="Account email" value={security.accountEmail} />
+                  <ReadOnlyCard label={t("accountEmail")} value={security.accountEmail} />
                   <ReadOnlyCard label="Role" value={security.role} />
                   <ReadOnlyCard
-                    label="Current session"
+                    label={t("currentSession")}
                     value={security.currentSessionId}
                   />
                   <ReadOnlyCard
@@ -1064,7 +1090,7 @@ export function SettingsWorkspace() {
       <Modal
         isOpen={Boolean(pendingSection)}
         onClose={() => setPendingSection(null)}
-        title="Discard unsaved changes?"
+        title={t("unsavedTitle")}
       >
         <div className="space-y-5">
           <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
@@ -1104,11 +1130,11 @@ export function SettingsWorkspace() {
       <Modal
         isOpen={isReplyDialogOpen}
         onClose={() => setIsReplyDialogOpen(false)}
-        title={editingReplyId ? "Edit Saved Reply" : "Add Saved Reply"}
+        title={editingReplyId ? tCommon("edit") : t("addReply")}
       >
         <div data-testid="saved-reply-dialog" className="space-y-5">
           {replyError ? <Alert tone="error">{replyError}</Alert> : null}
-          <LabeledField label="Title">
+          <LabeledField label={t("replyTitle")}>
             <Input
               disabled={!canManageSettings}
               value={replyForm.title}
@@ -1118,7 +1144,7 @@ export function SettingsWorkspace() {
             />
           </LabeledField>
           <div className="grid gap-4 md:grid-cols-2">
-            <LabeledField label="Category">
+            <LabeledField label={t("category")}>
               <Input
                 disabled={!canManageSettings}
                 list="saved-reply-categories"
@@ -1133,7 +1159,7 @@ export function SettingsWorkspace() {
                 ))}
               </datalist>
             </LabeledField>
-            <LabeledField label="Shortcut">
+            <LabeledField label={t("shortcut")}>
               <Input
                 disabled={!canManageSettings}
                 value={replyForm.shortcut}
@@ -1144,7 +1170,7 @@ export function SettingsWorkspace() {
             </LabeledField>
           </div>
           <TextAreaField
-            label="Message"
+            label={t("message")}
             value={replyForm.message}
             disabled={!canManageSettings}
             onChange={(value) =>
@@ -1160,7 +1186,7 @@ export function SettingsWorkspace() {
           {canManageSettings ? (
             <div className="flex justify-end">
               <Button className="w-auto" loading={isReplySaving} onClick={() => void handleSaveReply()}>
-                {editingReplyId ? "Save Saved Reply" : "Create Saved Reply"}
+                {editingReplyId ? t("saveReply") : t("createReply")}
               </Button>
             </div>
           ) : null}
@@ -1170,7 +1196,7 @@ export function SettingsWorkspace() {
       <Modal
         isOpen={Boolean(replyToDelete)}
         onClose={() => setReplyToDelete(null)}
-        title="Delete Saved Reply"
+        title={tCommon("delete")}
       >
         <div className="space-y-5">
           <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
@@ -1178,10 +1204,10 @@ export function SettingsWorkspace() {
           </p>
           <div className="flex justify-end gap-3">
             <Button className="w-auto" onClick={() => setReplyToDelete(null)} variant="secondary">
-              Cancel
+              {tCommon("cancel")}
             </Button>
             <Button className="w-auto" loading={isReplyDeleting} onClick={() => void handleDeleteReply()}>
-              Delete
+              {tCommon("delete")}
             </Button>
           </div>
         </div>
@@ -1213,6 +1239,7 @@ function SectionFrame({
   showActions?: boolean;
   title: string;
 }) {
+  const t = useTranslations("common");
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -1229,7 +1256,7 @@ function SectionFrame({
               onClick={onReset}
               variant="secondary"
             >
-              Reset
+              {t("reset")}
             </Button>
             <Button
               className="w-auto"
@@ -1238,7 +1265,7 @@ function SectionFrame({
               loading={isSaving}
               onClick={onSave}
             >
-              Save section
+              {t("save")}
             </Button>
           </div>
         ) : null}
@@ -1288,20 +1315,14 @@ function SelectField({
       >
         {label}
       </label>
-      <select
+      <Dropdown
         id={id}
-        aria-label={label}
-        className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-slate-950 focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-cyan-500 dark:focus:ring-slate-800 dark:disabled:bg-slate-800"
+        ariaLabel={label}
         disabled={disabled}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+        onChange={onChange}
+        options={options}
+      />
     </div>
   );
 }

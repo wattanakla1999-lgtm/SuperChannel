@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useState } from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/drawer";
@@ -11,6 +12,7 @@ import { Modal } from "@/components/ui/modal";
 import { Pagination } from "@/components/ui/pagination";
 import { Spinner } from "@/components/ui/spinner";
 import { Toast } from "@/components/ui/toast";
+import { Dropdown } from "@/components/ui/dropdown";
 import { classNames } from "@/lib/class-names";
 import { ApiError } from "@/lib/http/api-error";
 import {
@@ -49,13 +51,6 @@ const onlineStatusClasses: Record<TeamPresence, string> = {
   online: "bg-emerald-100 text-emerald-700",
 };
 
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
 type MemberFormState = {
   accountStatus: "active" | "inactive";
   role: TeamRole;
@@ -76,6 +71,10 @@ const initialInviteForm: InviteFormState = {
 };
 
 export function TeamWorkspace() {
+  const format = useFormatter();
+  const t = useTranslations("team");
+  const tCommon = useTranslations("common");
+  const formatDateTime = (value: string) => format.dateTime(new Date(value), { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Bangkok" });
   const workloadLimitInputId = useId();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [invitations, setInvitations] = useState<TeamInvitation[]>([]);
@@ -151,7 +150,7 @@ export function TeamWorkspace() {
         }
 
         setErrorMessage(
-          error instanceof ApiError ? error.message : "We couldn't load the team workspace.",
+          error instanceof ApiError ? error.message : tCommon("error"),
         );
       } finally {
         if (isMounted) {
@@ -165,7 +164,7 @@ export function TeamWorkspace() {
     return () => {
       isMounted = false;
     };
-  }, [query, refreshKey]);
+  }, [query, refreshKey, tCommon]);
 
   useEffect(() => {
     if (!toastMessage) {
@@ -207,7 +206,7 @@ export function TeamWorkspace() {
 
   const handleInvite = async () => {
     if (!inviteForm.email.trim() || !inviteForm.team.trim()) {
-      setInviteError("Enter a valid email and team before inviting.");
+      setInviteError(t("invalidEmail"));
       return;
     }
 
@@ -231,7 +230,7 @@ export function TeamWorkspace() {
           : current,
       );
       setToastTone("success");
-      setToastMessage("Invitation created");
+      setToastMessage(t("invited"));
       setIsInviteOpen(false);
       resetInviteForm();
       setRefreshKey((current) => current + 1);
@@ -272,7 +271,7 @@ export function TeamWorkspace() {
         current.map((member) => (member.id === updatedMember.id ? updatedMember : member)),
       );
       setToastTone("success");
-      setToastMessage("Member saved");
+      setToastMessage(t("updated"));
       setRefreshKey((current) => current + 1);
     } catch (error) {
       setToastTone("error");
@@ -348,20 +347,19 @@ export function TeamWorkspace() {
             <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
               <div className="space-y-2">
                 <h2 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-slate-100">
-                  Team management
+                  {t("title")}
                 </h2>
                 <p className="max-w-3xl text-sm text-slate-600 dark:text-slate-400">
-                  Search teammates, track workload, and manage invitations and access
-                  without leaving the operator workspace.
+                  {t("description")}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <StatPill
-                  label="Members"
+                  label={t("members", { count: summary?.memberCount ?? 0 })}
                   value={summary ? String(summary.memberCount) : "0"}
                 />
                 <StatPill
-                  label="Pending invites"
+                  label={t("pendingInvitations", { count: summary?.pendingInvitationCount ?? 0 })}
                   value={summary ? String(summary.pendingInvitationCount) : "0"}
                 />
                 <Button
@@ -373,7 +371,7 @@ export function TeamWorkspace() {
                     setIsInviteOpen(true);
                   }}
                 >
-                  Invite member
+                  {t("invite")}
                 </Button>
               </div>
             </div>
@@ -390,7 +388,7 @@ export function TeamWorkspace() {
             <div className="mt-5 grid gap-3 xl:grid-cols-[minmax(0,1.6fr)_repeat(4,minmax(0,1fr))]">
               <Input
                 data-testid="team-search"
-                placeholder="Search by name or email"
+                placeholder={t("search")}
                 value={searchTerm}
                 onChange={(event) => {
                   setSearchTerm(event.target.value);
@@ -398,7 +396,7 @@ export function TeamWorkspace() {
                 }}
               />
               <FilterSelect
-                label="Role"
+                label={t("role")}
                 value={roleFilter}
                 onChange={(value) => {
                   setRoleFilter(value as TeamRole | "all");
@@ -410,7 +408,7 @@ export function TeamWorkspace() {
                 }))}
               />
               <FilterSelect
-                label="Team"
+                label={t("group")}
                 value={teamFilter}
                 onChange={(value) => {
                   setTeamFilter(value);
@@ -419,7 +417,7 @@ export function TeamWorkspace() {
                 options={filters?.teams ?? []}
               />
               <FilterSelect
-                label="Online status"
+                label={t("onlineStatus")}
                 value={onlineStatusFilter}
                 onChange={(value) => {
                   setOnlineStatusFilter(value as TeamPresence | "all");
@@ -431,7 +429,7 @@ export function TeamWorkspace() {
                 }))}
               />
               <FilterSelect
-                label="Account status"
+                label={t("accountStatus")}
                 value={accountStatusFilter}
                 onChange={(value) => {
                   setAccountStatusFilter(
@@ -462,7 +460,7 @@ export function TeamWorkspace() {
                   }}
                   variant="secondary"
                 >
-                  Clear filters
+                  {tCommon("clearFilters")}
                 </Button>
               </div>
             ) : null}
@@ -504,29 +502,29 @@ export function TeamWorkspace() {
             {isLoading ? (
               <div className="flex min-h-[24rem] items-center justify-center text-sm text-slate-500 dark:text-slate-400">
                 <Spinner className="mr-2 text-slate-400 dark:text-slate-500" />
-                Loading team members...
+                {t("loading")}
               </div>
             ) : errorMessage ? (
               <div className="p-6">
                 <ErrorState
-                  actionLabel="Retry"
+                  actionLabel={tCommon("retry")}
                   description={errorMessage}
                   onAction={() => setRefreshKey((current) => current + 1)}
-                  title="Team workspace unavailable"
+                  title={t("emptyTitle")}
                 />
               </div>
             ) : members.length === 0 && hasActiveFilters ? (
               <div className="p-6">
                 <EmptyState
-                  description="Try adjusting the search or clearing one of the active filters."
-                  title="No team members match your filters."
+                  description={t("empty")}
+                  title={t("emptyTitle")}
                 />
               </div>
             ) : members.length === 0 ? (
               <div className="p-6">
                 <EmptyState
-                  description="Once members are added to the workspace, they will appear here."
-                  title="No team members yet"
+                  description={t("empty")}
+                  title={t("emptyTitle")}
                 />
               </div>
             ) : (
@@ -538,12 +536,12 @@ export function TeamWorkspace() {
                   <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
                     <thead className="bg-slate-50 dark:bg-slate-900">
                       <tr className="text-left text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                        <th className="px-4 py-3 font-semibold">Member</th>
-                        <th className="px-4 py-3 font-semibold">Role</th>
-                        <th className="px-4 py-3 font-semibold">Team</th>
-                        <th className="px-4 py-3 font-semibold">Workload</th>
-                        <th className="px-4 py-3 font-semibold">Last active</th>
-                        <th className="px-4 py-3 font-semibold">Action</th>
+                        <th className="px-4 py-3 font-semibold">{t("members", { count: 1 })}</th>
+                        <th className="px-4 py-3 font-semibold">{t("role")}</th>
+                        <th className="px-4 py-3 font-semibold">{t("group")}</th>
+                        <th className="px-4 py-3 font-semibold">{t("workloadLimit")}</th>
+                        <th className="px-4 py-3 font-semibold">{t("lastActive", { date: "" })}</th>
+                        <th className="px-4 py-3 font-semibold">{tCommon("edit")}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950">
@@ -644,12 +642,12 @@ export function TeamWorkspace() {
           setIsInviteOpen(false);
           resetInviteForm();
         }}
-        title="Invite member"
+        title={t("inviteTitle")}
       >
         <div data-testid="invite-member-dialog" className="space-y-5">
           {inviteError ? <ErrorState message={inviteError} /> : null}
           <label className="space-y-2">
-            <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">Email</span>
+            <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t("email")}</span>
             <Input
               placeholder="new.member@superchannel.local"
               value={inviteForm.email}
@@ -660,7 +658,7 @@ export function TeamWorkspace() {
           </label>
           <div className="grid gap-4 sm:grid-cols-2">
             <FilterSelect
-              label="Role"
+              label={t("role")}
               value={inviteForm.role}
               onChange={(value) =>
                 setInviteForm((current) => ({ ...current, role: value as TeamRole }))
@@ -672,7 +670,7 @@ export function TeamWorkspace() {
               }))}
             />
             <FilterSelect
-              label="Team"
+              label={t("group")}
               value={inviteForm.team}
               onChange={(value) =>
                 setInviteForm((current) => ({ ...current, team: value }))
@@ -692,7 +690,7 @@ export function TeamWorkspace() {
       <Drawer
         isOpen={Boolean(selectedMember)}
         onClose={closeMemberDrawer}
-        title={selectedMember?.name ?? "Team member"}
+        title={selectedMember?.name ?? t("title")}
       >
         {selectedMember && memberForm ? (
           <div data-testid="team-member-drawer" className="space-y-6">
@@ -701,16 +699,16 @@ export function TeamWorkspace() {
             </section>
 
             <section className="grid gap-4 lg:grid-cols-2">
-              <ReadOnlyField label="Email" value={selectedMember.email} />
+              <ReadOnlyField label={t("email")} value={selectedMember.email} />
               <ReadOnlyField
-                label="Last active"
+                label={t("lastActive", { date: "" })}
                 value={formatDateTime(selectedMember.lastActiveAt)}
               />
             </section>
 
             <div className="grid gap-4 lg:grid-cols-2">
               <FilterSelect
-                label="Role"
+                label={t("role")}
                 value={memberForm.role}
                 onChange={(value) =>
                   setMemberForm((current) =>
@@ -730,7 +728,7 @@ export function TeamWorkspace() {
                 disabled={!canManageMembers}
               />
               <FilterSelect
-                label="Team"
+                label={t("group")}
                 value={memberForm.team}
                 onChange={(value) =>
                   setMemberForm((current) =>
@@ -750,7 +748,7 @@ export function TeamWorkspace() {
 
             <div className="grid gap-4 lg:grid-cols-2">
               <FilterSelect
-                label="Account status"
+                label={t("accountStatus")}
                 value={memberForm.accountStatus}
                 onChange={(value) =>
                   setMemberForm((current) =>
@@ -773,7 +771,7 @@ export function TeamWorkspace() {
                 <span
                   className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
                 >
-                  Workload limit
+                  {t("workloadLimit")}
                 </span>
                 <Input
                   disabled={!canManageMembers}
@@ -797,11 +795,11 @@ export function TeamWorkspace() {
             <section className="rounded-[1.5rem] border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
               <div className="grid gap-4 sm:grid-cols-2">
                 <StatPill
-                  label="Active conversations"
+                  label={t("activeConversations")}
                   value={String(selectedMember.activeConversationCount)}
                 />
                 <StatPill
-                  label="Assigned conversations"
+                  label={t("assignedConversations")}
                   value={String(selectedMember.assignedConversationCount)}
                 />
               </div>
@@ -816,7 +814,7 @@ export function TeamWorkspace() {
                     loading={isSavingMember}
                     onClick={() => void handleSaveMember()}
                   >
-                    Save member
+                    {tCommon("save")}
                   </Button>
                   <Button
                     className="sm:w-auto"
@@ -824,7 +822,7 @@ export function TeamWorkspace() {
                     onClick={() => setConfirmAction("deactivate")}
                     variant="secondary"
                   >
-                    Deactivate member
+                    {t("deactivate")}
                   </Button>
                 </div>
                 <Button
@@ -832,7 +830,7 @@ export function TeamWorkspace() {
                   onClick={() => setConfirmAction("remove")}
                   variant="secondary"
                 >
-                  Remove member
+                  {t("remove")}
                 </Button>
               </div>
             ) : (
@@ -848,7 +846,7 @@ export function TeamWorkspace() {
       <Modal
         isOpen={Boolean(confirmAction && selectedMember)}
         onClose={() => setConfirmAction(null)}
-        title={confirmAction === "remove" ? "Remove member" : "Deactivate member"}
+        title={confirmAction === "remove" ? t("remove") : t("deactivate")}
       >
         <div className="space-y-5">
           <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
@@ -858,10 +856,10 @@ export function TeamWorkspace() {
           </p>
           <div className="flex justify-end gap-3">
             <Button className="w-auto" onClick={() => setConfirmAction(null)} variant="secondary">
-              Cancel
+              {tCommon("cancel")}
             </Button>
             <Button className="w-auto" onClick={() => void handleConfirmedAction()}>
-              Confirm
+              {tCommon("confirm")}
             </Button>
           </div>
         </div>
@@ -961,6 +959,7 @@ function FilterSelect({
   options: Array<{ label: string; value: string }>;
   value: string;
 }) {
+  const t = useTranslations("common");
   const id = useId();
 
   return (
@@ -971,21 +970,14 @@ function FilterSelect({
       <label className="sr-only" htmlFor={id}>
         {label}
       </label>
-      <select
+      <Dropdown
         id={id}
-        aria-label={label}
-        className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-slate-950 focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-cyan-500 dark:focus:ring-slate-800 dark:disabled:bg-slate-800"
+        ariaLabel={label}
         disabled={disabled}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        {allowAll ? <option value="all">All</option> : null}
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+        onChange={onChange}
+        options={allowAll ? [{ label: t("all"), value: "all" }, ...options] : options}
+      />
     </div>
   );
 }

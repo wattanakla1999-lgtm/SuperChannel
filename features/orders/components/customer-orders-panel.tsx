@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Spinner } from "@/components/ui/spinner";
+import { Dropdown } from "@/components/ui/dropdown";
 import { classNames } from "@/lib/class-names";
 import { ApiError } from "@/lib/http/api-error";
 import {
@@ -21,15 +23,8 @@ import type {
   OrderStatus,
 } from "../types/orders";
 
-const statusOptions: Array<{ label: string; value: OrderStatus | "all" }> = [
-  { label: "All statuses", value: "all" },
-  { label: "Pending", value: "Pending" },
-  { label: "Paid", value: "Paid" },
-  { label: "Processing", value: "Processing" },
-  { label: "Shipped", value: "Shipped" },
-  { label: "Delivered", value: "Delivered" },
-  { label: "Cancelled", value: "Cancelled" },
-  { label: "Refunded", value: "Refunded" },
+const statusOptions: Array<OrderStatus | "all"> = [
+  "all", "Pending", "Paid", "Processing", "Shipped", "Delivered", "Cancelled", "Refunded",
 ];
 
 const statusClasses: Record<OrderStatus, string> = {
@@ -57,19 +52,15 @@ function isForbidden(error: unknown) {
   return error instanceof ApiError && error.status === 403;
 }
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("en-US", {
+function formatCurrencyValue(value: number, locale: string) {
+  return new Intl.NumberFormat(locale, {
     currency: "THB",
     style: "currency",
   }).format(value);
 }
 
-function formatDateTime(value: string | null, timezone: string, options?: Intl.DateTimeFormatOptions) {
-  if (!value) {
-    return "No purchases yet";
-  }
-
-  return new Intl.DateTimeFormat("en", {
+function formatDateTimeValue(value: string, timezone: string, locale: string, options?: Intl.DateTimeFormatOptions) {
+  return new Intl.DateTimeFormat(locale, {
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
@@ -80,8 +71,8 @@ function formatDateTime(value: string | null, timezone: string, options?: Intl.D
   }).format(new Date(value));
 }
 
-function formatCompactDate(value: string, timezone: string) {
-  return formatDateTime(value, timezone, {
+function formatCompactDateValue(value: string, timezone: string, locale: string) {
+  return formatDateTimeValue(value, timezone, locale, {
     day: "numeric",
     month: "short",
     timeZone: timezone,
@@ -89,11 +80,11 @@ function formatCompactDate(value: string, timezone: string) {
   });
 }
 
-function toPlainInvoiceText(order: OrderDetail, invoice: NonNullable<OrderInvoiceResponse["invoice"]>, timezone: string) {
+function toPlainInvoiceText(order: OrderDetail, invoice: NonNullable<OrderInvoiceResponse["invoice"]>, timezone: string, locale: string) {
   const lines = [
     `Invoice ${invoice.invoiceNumber}`,
     `Order ${order.orderNumber}`,
-    `Issued ${formatDateTime(invoice.issuedAt, timezone)}`,
+    `Issued ${formatDateTimeValue(invoice.issuedAt, timezone, locale)}`,
     "",
     `Billed to: ${invoice.billedTo.name}`,
     invoice.billedTo.address,
@@ -101,13 +92,13 @@ function toPlainInvoiceText(order: OrderDetail, invoice: NonNullable<OrderInvoic
     `Tax ID: ${invoice.billedTo.taxId}`,
     "",
     ...invoice.lineItems.map(
-      (item) => `${item.description} x${item.quantity} - ${formatCurrency(item.amount)}`,
+      (item) => `${item.description} x${item.quantity} - ${formatCurrencyValue(item.amount, locale)}`,
     ),
     "",
-    `Subtotal: ${formatCurrency(invoice.subtotalAmount)}`,
-    `Shipping: ${formatCurrency(invoice.shippingFee)}`,
-    `Tax: ${formatCurrency(invoice.taxAmount)}`,
-    `Total: ${formatCurrency(invoice.totalAmount)}`,
+    `Subtotal: ${formatCurrencyValue(invoice.subtotalAmount, locale)}`,
+    `Shipping: ${formatCurrencyValue(invoice.shippingFee, locale)}`,
+    `Tax: ${formatCurrencyValue(invoice.taxAmount, locale)}`,
+    `Total: ${formatCurrencyValue(invoice.totalAmount, locale)}`,
     "",
     invoice.notes,
   ];
@@ -124,6 +115,14 @@ export function CustomerOrdersPanel({
   customerId,
   customerName,
 }: CustomerOrdersPanelProps) {
+  const locale = useLocale();
+  const t = useTranslations("orders");
+  const tCommon = useTranslations("common");
+  const formatCurrency = (value: number) => formatCurrencyValue(value, locale);
+  const formatDateTime = (value: string | null, zone: string, options?: Intl.DateTimeFormatOptions) =>
+    value ? formatDateTimeValue(value, zone, locale, options) : t("noPurchases");
+  const formatCompactDate = (value: string, zone: string) =>
+    formatCompactDateValue(value, zone, locale);
   const [summary, setSummary] = useState<CommerceSummary | null>(null);
   const [orders, setOrders] = useState<OrderHistoryEntry[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -163,10 +162,10 @@ export function CustomerOrdersPanel({
         setIsForbiddenState(isForbidden(error));
         setError(
           isUnauthorized(error)
-            ? "Your session has expired. Please sign in again."
+            ? tCommon("sessionExpired")
             : error instanceof ApiError
               ? error.message
-              : "We couldn't load this customer's commerce data.",
+              : t("unavailable"),
         );
       } finally {
         if (isMounted) {
@@ -180,7 +179,7 @@ export function CustomerOrdersPanel({
     return () => {
       isMounted = false;
     };
-  }, [customerId, retryToken]);
+  }, [customerId, retryToken, t, tCommon]);
 
   const visibleOrders = orders
     .filter((order) => statusFilter === "all" || order.status === statusFilter)
@@ -219,7 +218,7 @@ export function CustomerOrdersPanel({
         setError(
           error instanceof ApiError
             ? error.message
-            : "We couldn't load order details right now.",
+            : t("unavailable"),
         );
       }
     }
@@ -229,7 +228,7 @@ export function CustomerOrdersPanel({
     return () => {
       isMounted = false;
     };
-  }, [resolvedSelectedOrderId]);
+  }, [resolvedSelectedOrderId, t]);
 
   useEffect(() => {
     if (!resolvedSelectedOrderId) {
@@ -263,7 +262,7 @@ export function CustomerOrdersPanel({
         setError(
           error instanceof ApiError
             ? error.message
-            : "We couldn't load the invoice preview.",
+            : t("unavailable"),
         );
       }
     }
@@ -273,7 +272,7 @@ export function CustomerOrdersPanel({
     return () => {
       isMounted = false;
     };
-  }, [orders, resolvedSelectedOrderId]);
+  }, [orders, resolvedSelectedOrderId, t]);
 
   const selectedOrderSummary =
     resolvedSelectedOrderId
@@ -307,7 +306,7 @@ export function CustomerOrdersPanel({
     }
 
     nextWindow.document.write(
-      `<pre style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; padding: 24px;">${toPlainInvoiceText(orderDetail, invoice, timezone)}</pre>`,
+      `<pre style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; padding: 24px;">${toPlainInvoiceText(orderDetail, invoice, timezone, locale)}</pre>`,
     );
     nextWindow.document.close();
     nextWindow.focus();
@@ -319,7 +318,7 @@ export function CustomerOrdersPanel({
       return;
     }
 
-    const blob = new Blob([toPlainInvoiceText(orderDetail, invoice, timezone)], {
+    const blob = new Blob([toPlainInvoiceText(orderDetail, invoice, timezone, locale)], {
       type: "text/plain;charset=utf-8",
     });
     const objectUrl = URL.createObjectURL(blob);
@@ -334,7 +333,7 @@ export function CustomerOrdersPanel({
     return (
       <div className="flex min-h-[320px] items-center justify-center text-sm text-slate-500 dark:text-slate-400">
         <Spinner className="mr-2 text-slate-400 dark:text-slate-500" />
-        Loading customer commerce...
+        {t("loading")}
       </div>
     );
   }
@@ -342,8 +341,8 @@ export function CustomerOrdersPanel({
   if (isForbiddenState) {
     return (
       <ErrorState
-        description={error ?? "You do not have access to this customer's commerce data."}
-        title="Commerce access is restricted"
+        description={error ?? t("restricted")}
+        title={t("restrictedTitle")}
       />
     );
   }
@@ -351,7 +350,7 @@ export function CustomerOrdersPanel({
   if (error && orders.length === 0 && summary === null) {
     return (
       <ErrorState
-        actionLabel="Retry"
+        actionLabel={tCommon("retry")}
         description={error}
         onAction={() => {
           setSummary(null);
@@ -365,7 +364,7 @@ export function CustomerOrdersPanel({
           setRetryToken((current) => current + 1);
         }}
         testId="orders-retry-button"
-        title="Orders unavailable"
+        title={t("unavailableTitle")}
       />
     );
   }
@@ -377,17 +376,17 @@ export function CustomerOrdersPanel({
           data-testid="purchase-summary"
           className="grid gap-3 sm:grid-cols-2"
         >
-          <SummaryCard label="Total orders" value={String(summary?.totalOrders ?? 0)} />
+          <SummaryCard label={t("totalOrders")} value={new Intl.NumberFormat(locale).format(summary?.totalOrders ?? 0)} />
           <SummaryCard
-            label="Total spend"
+            label={t("totalSpend")}
             value={formatCurrency(summary?.totalSpend ?? 0)}
           />
           <SummaryCard
-            label="Average order value"
+            label={t("averageOrderValue")}
             value={formatCurrency(summary?.averageOrderValue ?? 0)}
           />
           <SummaryCard
-            label="Last purchase"
+            label={t("lastPurchase")}
             value={formatDateTime(summary?.lastPurchaseAt ?? null, timezone, {
               day: "numeric",
               month: "short",
@@ -401,41 +400,30 @@ export function CustomerOrdersPanel({
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-sm font-semibold text-slate-950 dark:text-slate-100">
-              Order history
+              {t("history")}
             </p>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Read-only marketplace and direct store purchases for {customerName}
+              {t("historyDescription", { name: customerName })}
             </p>
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-              <span className="mb-1 block">Status</span>
-              <select
-                aria-label="Order status filter"
-                className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-950 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              <span className="mb-1 block">{tCommon("status")}</span>
+              <Dropdown
+                ariaLabel={t("statusFilterLabel")}
                 value={statusFilter}
-                onChange={(event) =>
-                  setStatusFilter(event.target.value as OrderStatus | "all")
-                }
-              >
-                {statusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => setStatusFilter(value as OrderStatus | "all")}
+                options={statusOptions.map((option) => ({ label: option === "all" ? t("allStatuses") : t(`statuses.${option}`), value: option }))}
+              />
             </label>
             <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-              <span className="mb-1 block">Sort</span>
-              <select
-                aria-label="Order sort"
-                className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-950 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              <span className="mb-1 block">{t("sort")}</span>
+              <Dropdown
+                ariaLabel={t("sortLabel")}
                 value={sortOrder}
-                onChange={(event) => setSortOrder(event.target.value as "newest" | "oldest")}
-              >
-                <option value="newest">Newest first</option>
-                <option value="oldest">Oldest first</option>
-              </select>
+                onChange={(value) => setSortOrder(value as "newest" | "oldest")}
+                options={[{ label: t("newest"), value: "newest" }, { label: t("oldest"), value: "oldest" }]}
+              />
             </label>
           </div>
         </div>
@@ -443,13 +431,13 @@ export function CustomerOrdersPanel({
         <div data-testid="order-history" className="space-y-3">
           {orders.length === 0 ? (
             <EmptyState
-              description="This customer has not placed any mock marketplace or direct-store orders yet."
-              title="No purchase history yet"
+              description={t("noHistory")}
+              title={t("noHistoryTitle")}
             />
           ) : visibleOrders.length === 0 ? (
             <EmptyState
-              description="Try another status filter to see matching purchases."
-              title="No orders match this filter"
+              description={t("noMatches")}
+              title={t("noMatchesTitle")}
             />
           ) : (
             visibleOrders.map((order) => (
@@ -485,11 +473,11 @@ export function CustomerOrdersPanel({
                             statusClasses[order.status],
                           )}
                         >
-                          {order.status}
+                          {t(`statuses.${order.status}`)}
                         </span>
                         {order.integrationStatus !== "connected" ? (
                           <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-800">
-                            Historical data
+                            {t("historical")}
                           </span>
                         ) : null}
                       </div>
@@ -498,7 +486,7 @@ export function CustomerOrdersPanel({
                           {order.orderNumber}
                         </p>
                         <p className="break-words text-sm text-slate-500 dark:text-slate-400">
-                          {formatCompactDate(order.orderedAt, timezone)} · {order.itemCount} items
+                          {formatCompactDate(order.orderedAt, timezone)} · {t("itemCount", { count: order.itemCount })}
                         </p>
                       </div>
                     </div>
@@ -516,7 +504,7 @@ export function CustomerOrdersPanel({
                             handleSelectOrder(order.id);
                           }}
                         >
-                          View invoice
+                          {t("viewInvoice")}
                         </Button>
                       ) : null}
                     </div>
@@ -536,7 +524,7 @@ export function CustomerOrdersPanel({
           {isDetailLoading || !orderDetail ? (
             <div className="flex items-center justify-center py-8 text-sm text-slate-500 dark:text-slate-400">
               <Spinner className="mr-2 text-slate-400 dark:text-slate-500" />
-              Loading order details...
+              {t("loadingDetails")}
             </div>
           ) : (
             <div className="space-y-4">
@@ -551,24 +539,24 @@ export function CustomerOrdersPanel({
                 </div>
                 {orderDetail.integrationStatus !== "connected" ? (
                   <span className="max-w-full break-words rounded-full bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-800">
-                    Historical data from a disconnected marketplace mock
+                    {t("historicalDescription")}
                   </span>
                 ) : null}
               </div>
 
               <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2">
-                <InfoBlock label="Payment method" value={orderDetail.paymentMethod} />
+                <InfoBlock label={t("paymentMethod")} value={orderDetail.paymentMethod} />
                 <InfoBlock
-                  label="Tracking number"
-                  value={orderDetail.trackingNumber ?? "Not available"}
+                  label={t("trackingNumber")}
+                  value={orderDetail.trackingNumber ?? t("notAvailable")}
                 />
-                <InfoBlock label="Billing name" value={orderDetail.billingName} />
-                <InfoBlock label="Delivery address" value={orderDetail.deliveryAddress} />
+                <InfoBlock label={t("billingName")} value={orderDetail.billingName} />
+                <InfoBlock label={t("deliveryAddress")} value={orderDetail.deliveryAddress} />
               </div>
 
               <div className="space-y-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                  Items
+                  {t("items")}
                 </p>
                 <div className="space-y-3">
                   {orderDetail.items.map((item) => (
@@ -582,13 +570,13 @@ export function CustomerOrdersPanel({
                             {item.name}
                           </p>
                           <p className="break-words text-xs text-slate-500 dark:text-slate-400">
-                            SKU {item.sku} · Qty {item.quantity}
+                            {t("sku", { sku: item.sku })} · {t("quantity", { count: item.quantity })}
                           </p>
                         </div>
                         <div className="min-w-0 text-sm text-slate-700 dark:text-slate-300 sm:text-right">
                           <p>{formatCurrency(item.unitPrice)}</p>
                           <p className="text-xs text-slate-500 dark:text-slate-400">
-                            Discount {formatCurrency(item.discountAmount)}
+                            {t("discount", { amount: formatCurrency(item.discountAmount) })}
                           </p>
                         </div>
                       </div>
@@ -606,7 +594,7 @@ export function CustomerOrdersPanel({
                     data-testid="fulfillment-timeline-heading"
                     className="whitespace-normal text-xs font-semibold uppercase leading-5 tracking-[0.12em] text-slate-500 dark:text-slate-400 sm:tracking-[0.18em]"
                   >
-                    Fulfillment timeline
+                    {t("timeline")}
                   </p>
                   <div className="space-y-3">
                     {orderDetail.fulfillmentTimeline.map((entry) => (
@@ -635,14 +623,14 @@ export function CustomerOrdersPanel({
                   className="w-full max-w-full overflow-hidden rounded-[1.25rem] border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950"
                 >
                   <p className="whitespace-normal text-xs font-semibold uppercase leading-5 tracking-[0.12em] text-slate-500 dark:text-slate-400 sm:tracking-[0.18em]">
-                    Charges
+                    {t("charges")}
                   </p>
                   <dl className="mt-3 space-y-3 text-sm text-slate-700 dark:text-slate-300">
-                    <ChargeRow label="Subtotal" value={formatCurrency(orderDetail.subtotalAmount)} />
-                    <ChargeRow label="Shipping" value={formatCurrency(orderDetail.shippingFee)} />
+                    <ChargeRow label={t("subtotal")} value={formatCurrency(orderDetail.subtotalAmount)} />
+                    <ChargeRow label={t("shipping")} value={formatCurrency(orderDetail.shippingFee)} />
                     <ChargeRow
                       isTotal
-                      label="Total"
+                      label={t("total")}
                       value={formatCurrency(orderDetail.totalAmount)}
                     />
                   </dl>
@@ -661,19 +649,19 @@ export function CustomerOrdersPanel({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <p className="text-sm font-semibold text-slate-950 dark:text-slate-100">
-                Invoice preview
+                {t("invoicePreview")}
               </p>
               <p className="break-words text-xs text-slate-500 dark:text-slate-400">
-                Local mock print and download only
+                {t("invoiceMock")}
               </p>
             </div>
             {invoice ? (
               <div className="flex flex-wrap gap-2">
                 <Button className="w-full sm:w-auto" variant="secondary" onClick={handlePrintInvoice}>
-                  Print
+                  {tCommon("print")}
                 </Button>
                 <Button className="w-full sm:w-auto" variant="secondary" onClick={handleDownloadInvoice}>
-                  Download
+                  {tCommon("download")}
                 </Button>
               </div>
             ) : null}
@@ -682,7 +670,7 @@ export function CustomerOrdersPanel({
           {isInvoiceLoading ? (
             <div className="flex items-center justify-center py-8 text-sm text-slate-500 dark:text-slate-400">
               <Spinner className="mr-2 text-slate-400 dark:text-slate-500" />
-              Loading invoice preview...
+              {t("loadingInvoice")}
             </div>
           ) : invoice && orderDetail ? (
             <div className="mt-4 space-y-4 rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900">
@@ -692,7 +680,7 @@ export function CustomerOrdersPanel({
                     {invoice.invoiceNumber}
                   </p>
                   <p className="break-words text-sm text-slate-500 dark:text-slate-400">
-                    Order {invoice.orderNumber} · Issued {formatDateTime(invoice.issuedAt, timezone)}
+                    {t("invoiceOrder", { order: invoice.orderNumber, date: formatDateTime(invoice.issuedAt, timezone) })}
                   </p>
                 </div>
                 <span className="max-w-full break-words rounded-full bg-slate-950 px-3 py-2 text-xs font-semibold text-white dark:bg-cyan-500 dark:text-slate-950">
@@ -701,10 +689,10 @@ export function CustomerOrdersPanel({
               </div>
 
               <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2">
-                <InfoBlock label="Billed to" value={invoice.billedTo.name} />
-                <InfoBlock label="Tax ID" value={invoice.billedTo.taxId} />
-                <InfoBlock label="Email" value={invoice.billedTo.email} />
-                <InfoBlock label="Address" value={invoice.billedTo.address} />
+                <InfoBlock label={t("billedTo")} value={invoice.billedTo.name} />
+                <InfoBlock label={t("taxId")} value={invoice.billedTo.taxId} />
+                <InfoBlock label={t("email")} value={invoice.billedTo.email} />
+                <InfoBlock label={t("address")} value={invoice.billedTo.address} />
               </div>
 
               <div className="space-y-3">
@@ -718,7 +706,7 @@ export function CustomerOrdersPanel({
                         {item.description}
                       </p>
                       <p className="text-xs text-slate-500 dark:text-slate-400">
-                        Qty {item.quantity}
+                        {t("quantity", { count: item.quantity })}
                       </p>
                     </div>
                     <p className="min-w-0 break-words text-sm text-slate-700 dark:text-slate-300 sm:text-right">
@@ -730,13 +718,13 @@ export function CustomerOrdersPanel({
 
               <div className="rounded-[1.25rem] border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950">
                 <dl className="space-y-3 text-sm text-slate-700 dark:text-slate-300">
-                  <ChargeRow label="Subtotal" value={formatCurrency(invoice.subtotalAmount)} />
-                  <ChargeRow label="Shipping" value={formatCurrency(invoice.shippingFee)} />
+                  <ChargeRow label={t("subtotal")} value={formatCurrency(invoice.subtotalAmount)} />
+                  <ChargeRow label={t("shipping")} value={formatCurrency(invoice.shippingFee)} />
                   <ChargeRow
-                    label={`Tax (${Math.round(invoice.taxRate * 100)}%)`}
+                    label={t("tax", { rate: new Intl.NumberFormat(locale, { style: "percent" }).format(invoice.taxRate) })}
                     value={formatCurrency(invoice.taxAmount)}
                   />
-                  <ChargeRow isTotal label="Total" value={formatCurrency(invoice.totalAmount)} />
+                  <ChargeRow isTotal label={t("total")} value={formatCurrency(invoice.totalAmount)} />
                 </dl>
               </div>
 
@@ -745,8 +733,8 @@ export function CustomerOrdersPanel({
           ) : (
             <div className="mt-4">
               <EmptyState
-                description="This order does not have a mock invoice preview."
-                title="No invoice available"
+                description={t("noInvoice")}
+                title={t("noInvoiceTitle")}
               />
             </div>
           )}

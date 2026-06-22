@@ -2,6 +2,7 @@
 
 import type { ChangeEvent, FormEvent } from "react";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -19,6 +20,8 @@ const initialValues: LoginInput = {
 };
 
 export function LoginForm() {
+  const t = useTranslations("login");
+  const tCommon = useTranslations("common");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [values, setValues] = useState(initialValues);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -55,13 +58,13 @@ export function LoginForm() {
     const normalizedEmail = values.email.trim();
 
     if (!normalizedEmail) {
-      nextErrors.email = "Please enter your email address";
+      nextErrors.email = t("emailRequired");
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-      nextErrors.email = "Please enter a valid email address";
+      nextErrors.email = t("emailInvalid");
     }
 
     if (!values.password) {
-      nextErrors.password = "Please enter your password";
+      nextErrors.password = t("passwordRequired");
     }
 
     setErrors(nextErrors);
@@ -93,8 +96,10 @@ export function LoginForm() {
     } catch (error) {
       const message =
         error instanceof ApiError
-          ? error.message
-          : "Something went wrong. Please try again.";
+          ? error.code === "INVALID_CREDENTIALS"
+            ? t("invalidCredentials")
+            : tCommon("error")
+          : tCommon("error");
       setFormError(message);
       setIsSubmitting(false);
     }
@@ -107,7 +112,7 @@ export function LoginForm() {
           htmlFor="email"
           className="text-sm font-semibold text-slate-800 dark:text-slate-200"
         >
-          Email address
+          {t("email")}
         </label>
         <Input
           id="email"
@@ -129,14 +134,14 @@ export function LoginForm() {
             htmlFor="password"
             className="text-sm font-semibold text-slate-800 dark:text-slate-200"
           >
-            Password
+            {t("password")}
           </label>
           <button
             type="button"
             className="text-sm font-medium text-slate-600 transition hover:text-slate-950 dark:text-slate-400 dark:hover:text-slate-100"
             onClick={() => setShowPassword((current) => !current)}
           >
-            {showPassword ? "Hide password" : "Show password"}
+            {showPassword ? t("hidePassword") : t("showPassword")}
           </button>
         </div>
         <Input
@@ -144,7 +149,7 @@ export function LoginForm() {
           name="password"
           autoComplete="current-password"
           error={errors.password}
-          placeholder="Enter your password"
+          placeholder={t("passwordPlaceholder")}
           type={showPassword ? "text" : "password"}
           value={values.password}
           onChange={handleChange("password")}
@@ -158,7 +163,7 @@ export function LoginForm() {
         <Checkbox
           id="rememberMe"
           checked={values.rememberMe}
-          label="Remember me"
+          label={t("remember")}
           onChange={handleChange("rememberMe")}
         />
         <button
@@ -166,11 +171,11 @@ export function LoginForm() {
           className="text-left text-sm font-medium text-slate-600 transition hover:text-slate-950 dark:text-slate-400 dark:hover:text-slate-100 sm:text-right"
           onClick={() =>
             setForgotPasswordMessage(
-              "Password reset is unavailable in the mock environment. Use the demo credentials provided in the spec.",
+              t("forgotMock"),
             )
           }
         >
-          Forgot password?
+          {t("forgot")}
         </button>
       </div>
 
@@ -183,7 +188,7 @@ export function LoginForm() {
         aria-busy={isBusy}
         aria-disabled={isBusy}
       >
-        {isBusy ? "Signing in..." : "Sign in"}
+        {isBusy ? t("submitting") : t("submit")}
       </Button>
     </form>
   );

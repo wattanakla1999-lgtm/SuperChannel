@@ -1,5 +1,6 @@
 import { Button } from "./button";
 import { classNames } from "@/lib/class-names";
+import { useTranslations } from "next-intl";
 
 type PaginationProps = {
   className?: string;
@@ -36,6 +37,7 @@ export function Pagination({
   testId,
   totalPages,
 }: PaginationProps) {
+  const t = useTranslations("common");
   if (totalPages <= 1) {
     return null;
   }
@@ -44,7 +46,7 @@ export function Pagination({
 
   return (
     <nav
-      aria-label="Pagination"
+      aria-label={t("pageOf", { page, total: totalPages })}
       className={classNames("flex flex-wrap items-center gap-2", className)}
       data-testid={testId}
     >
@@ -54,7 +56,7 @@ export function Pagination({
         onClick={() => onPageChange(page - 1)}
         variant="secondary"
       >
-        Previous
+        {t("previousPage")}
       </Button>
       <div className="flex items-center gap-2">
         {pages.map((currentPage, index) => {
@@ -90,7 +92,7 @@ export function Pagination({
         onClick={() => onPageChange(page + 1)}
         variant="secondary"
       >
-        Next
+        {t("nextPage")}
       </Button>
     </nav>
   );

@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale, getMessages, getTimeZone } from "next-intl/server";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -17,16 +19,28 @@ const themeScript = `
   })();
 `;
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const [locale, messages, timeZone] = await Promise.all([
+    getLocale(),
+    getMessages(),
+    getTimeZone(),
+  ]);
+
   return (
-    <html lang="en" className="h-full antialiased" suppressHydrationWarning>
+    <html lang={locale} className="h-full antialiased" suppressHydrationWarning>
       <body className="min-h-full bg-slate-50 font-sans text-slate-950 transition-colors dark:bg-slate-950 dark:text-slate-100">
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
-        {children}
+        <NextIntlClientProvider
+          locale={locale}
+          messages={messages}
+          timeZone={timeZone}
+        >
+          {children}
+        </NextIntlClientProvider>
       </body>
     </html>
   );

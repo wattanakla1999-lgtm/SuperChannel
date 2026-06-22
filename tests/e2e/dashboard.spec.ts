@@ -56,6 +56,27 @@ test.describe("dashboard", () => {
     );
   });
 
+  test("desktop sidebar stays fixed while the page scrolls", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 700 });
+    await loginAs(page);
+    await page.goto("/settings");
+
+    const sidebar = page.getByTestId("authenticated-sidebar");
+    await expect(sidebar).toBeVisible();
+    await expect(sidebar).toHaveCSS("position", "sticky");
+
+    await page.getByTestId("settings-page").evaluate((element) => {
+      element.style.minHeight = "1600px";
+    });
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+
+    const sidebarBox = await sidebar.boundingBox();
+    expect(sidebarBox?.y).toBeGreaterThanOrEqual(0);
+    expect(sidebarBox?.y).toBeLessThanOrEqual(1);
+    expect(sidebarBox?.height).toBeLessThanOrEqual(700);
+  });
+
   test("KPI values, charts, and agent rows render from shared mock data", async ({
     page,
   }) => {
@@ -140,6 +161,21 @@ test.describe("dashboard", () => {
         custom.overview.kpis.averageFirstResponseMinutes.valueDisplay,
       );
     }
+  });
+
+  test("custom dropdown and date picker support pointer interaction", async ({ page }) => {
+    await loginAs(page);
+    await page.goto("/dashboard");
+
+    await page.getByRole("button", { name: "Last 7 days" }).click();
+    await page.getByRole("listbox", { name: "Date range" }).getByRole("option", { name: "Custom" }).click();
+    await expect(page.getByLabel("Start date")).toBeAttached();
+
+    await page.getByRole("button", { name: "Start date" }).click();
+    const calendar = page.getByRole("dialog", { name: "Start date" });
+    await expect(calendar).toBeVisible();
+    await calendar.getByRole("button", { name: "19", exact: true }).click();
+    await expect(page.getByLabel("Start date")).toHaveValue(/2026-06-19/);
   });
 
   test("empty, loading, error, and retry states work", async ({ page }) => {
