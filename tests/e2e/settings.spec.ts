@@ -88,7 +88,7 @@ test.describe("settings", () => {
     await expect(page.getByTestId("saved-reply-list")).toBeVisible();
     await page.getByRole("button", { name: "Notifications Alert routing for messages, mentions, publishing, and integrations." }).click();
     await expect(page.getByRole("heading", { name: "Notifications" })).toBeVisible();
-    await page.getByRole("button", { name: "Security Session visibility and mock security controls." }).click();
+    await page.getByRole("button", { name: "Security Session visibility and account security details." }).click();
     await expect(page.getByText("Two-factor authentication", { exact: true })).toBeVisible();
   });
 
@@ -107,7 +107,7 @@ test.describe("settings", () => {
     await expect(page.getByText("Closing time must be after opening time.")).toBeVisible();
   });
 
-  test("saving and resetting settings update mock state correctly", async ({ page }) => {
+  test("saving and resetting settings update state correctly", async ({ page }) => {
     await loginAs(page);
     await page.goto("/settings");
 
@@ -202,7 +202,7 @@ test.describe("settings", () => {
     );
   });
 
-  test("Notification toggles persist in mock state", async ({ page }) => {
+  test("Notification toggles persist in saved state", async ({ page }) => {
     await loginAs(page);
     await page.goto("/settings");
 
@@ -218,7 +218,7 @@ test.describe("settings", () => {
     await expect(page.getByLabel("Email")).not.toBeChecked();
   });
 
-  test("read-only roles cannot update settings through the UI or mock API", async ({
+  test("read-only roles cannot update settings through the UI or API", async ({
     page,
   }) => {
     await loginAs(page, "supervisor@superchannel.local");

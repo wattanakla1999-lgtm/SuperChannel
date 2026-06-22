@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { getMockSession } from "@/server/auth/mock-session";
-import { inviteMockTeamMember } from "@/server/team/mock-team-data";
+import { getAuthenticatedSession } from "@/server/auth/session";
 import type { TeamRole } from "@/features/team/types/team";
+import { unauthorizedResponse } from "@/server/http/responses";
+import { inviteTeamMemberInDatabase } from "@/server/services/team";
 
 type InvitationBody = {
   email?: unknown;
@@ -31,13 +32,10 @@ function toErrorResponse(error: unknown) {
 }
 
 export async function POST(request: Request) {
-  const session = await getMockSession();
+  const session = await getAuthenticatedSession();
 
   if (!session) {
-    return NextResponse.json(
-      { code: "UNAUTHORIZED", message: "Your session has expired. Please sign in again." },
-      { status: 401 },
-    );
+    return unauthorizedResponse();
   }
 
   const body = (await request.json().catch(() => null)) as InvitationBody | null;
@@ -57,19 +55,12 @@ export async function POST(request: Request) {
     );
   }
 
-  await new Promise((resolve) => setTimeout(resolve, 260));
-
   try {
-    const invitation = inviteMockTeamMember(
-      session.id,
-      session.accountId,
-      session.user.role as TeamRole,
-      {
-        email: body.email.trim(),
-        role: body.role as TeamRole,
-        team: body.team.trim(),
-      },
-    );
+    const invitation = await inviteTeamMemberInDatabase(session, {
+      email: body.email.trim(),
+      role: body.role as TeamRole,
+      team: body.team.trim(),
+    });
 
     return NextResponse.json(invitation, { status: 201 });
   } catch (error) {

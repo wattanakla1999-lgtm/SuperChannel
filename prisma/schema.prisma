@@ -11,6 +11,8 @@ datasource db {
 enum AppLocale {
   EN @map("en")
   TH @map("th")
+
+  @@map("app_locale")
 }
 
 enum WorkspaceRole {
@@ -18,12 +20,16 @@ enum WorkspaceRole {
   ADMIN      @map("admin")
   SUPERVISOR @map("supervisor")
   AGENT      @map("agent")
+
+  @@map("workspace_role")
 }
 
 enum MemberStatus {
   ACTIVE   @map("active")
   INACTIVE @map("inactive")
   INVITED  @map("invited")
+
+  @@map("member_status")
 }
 
 enum InvitationStatus {
@@ -31,12 +37,16 @@ enum InvitationStatus {
   ACCEPTED @map("accepted")
   REVOKED  @map("revoked")
   EXPIRED  @map("expired")
+
+  @@map("invitation_status")
 }
 
 enum PresenceStatus {
   ONLINE  @map("online")
   AWAY    @map("away")
   OFFLINE @map("offline")
+
+  @@map("presence_status")
 }
 
 enum ChannelType {
@@ -49,18 +59,24 @@ enum ChannelType {
   SHOPEE      @map("shopee")
   LAZADA      @map("lazada")
   TIKTOK_SHOP @map("tiktok_shop")
+
+  @@map("channel_type")
 }
 
 enum ConversationStatus {
   OPEN     @map("open")
   PENDING  @map("pending")
   RESOLVED @map("resolved")
+
+  @@map("conversation_status")
 }
 
 enum MessageDirection {
   INBOUND  @map("inbound")
   OUTBOUND @map("outbound")
   INTERNAL @map("internal")
+
+  @@map("message_direction")
 }
 
 enum MessageType {
@@ -68,12 +84,16 @@ enum MessageType {
   IMAGE @map("image")
   NOTE  @map("note")
   FILE  @map("file")
+
+  @@map("message_type")
 }
 
 enum AttachmentKind {
   IMAGE @map("image")
   FILE  @map("file")
   VIDEO @map("video")
+
+  @@map("attachment_kind")
 }
 
 enum IntegrationProvider {
@@ -86,11 +106,15 @@ enum IntegrationProvider {
   SHOPEE      @map("shopee")
   LAZADA      @map("lazada")
   TIKTOK_SHOP @map("tiktok_shop")
+
+  @@map("integration_provider")
 }
 
 enum IntegrationCapability {
   INBOX      @map("inbox")
   PUBLISHING @map("publishing")
+
+  @@map("integration_capability")
 }
 
 enum IntegrationStatus {
@@ -99,6 +123,8 @@ enum IntegrationStatus {
   EXPIRED      @map("expired")
   ERROR        @map("error")
   COMING_SOON  @map("coming_soon")
+
+  @@map("integration_status")
 }
 
 enum PublishingStatus {
@@ -106,12 +132,16 @@ enum PublishingStatus {
   SCHEDULED @map("scheduled")
   PUBLISHED @map("published")
   FAILED    @map("failed")
+
+  @@map("publishing_status")
 }
 
 enum PublishSubmitMode {
   DRAFT    @map("draft")
   PUBLISH  @map("publish")
   SCHEDULE @map("schedule")
+
+  @@map("publish_submit_mode")
 }
 
 enum PublishingTargetStatus {
@@ -120,6 +150,8 @@ enum PublishingTargetStatus {
   PUBLISHED @map("published")
   FAILED    @map("failed")
   SKIPPED   @map("skipped")
+
+  @@map("publishing_target_status")
 }
 
 enum OrderMarketplace {
@@ -127,6 +159,8 @@ enum OrderMarketplace {
   LAZADA      @map("lazada")
   TIKTOK_SHOP @map("tiktok_shop")
   DIRECT_STORE @map("direct_store")
+
+  @@map("order_marketplace")
 }
 
 enum OrderStatus {
@@ -137,18 +171,24 @@ enum OrderStatus {
   DELIVERED  @map("delivered")
   CANCELLED  @map("cancelled")
   REFUNDED   @map("refunded")
+
+  @@map("order_status")
 }
 
 enum WebhookEventStatus {
   PENDING   @map("pending")
   PROCESSED @map("processed")
   FAILED    @map("failed")
+
+  @@map("webhook_event_status")
 }
 
 enum AuditActorType {
   USER    @map("user")
   SYSTEM  @map("system")
   WEBHOOK @map("webhook")
+
+  @@map("audit_actor_type")
 }
 
 model Organization {

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
@@ -49,9 +50,22 @@ export function CustomerDrawer({
         <div data-testid="customer-drawer" className="space-y-6">
           <section className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-start gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-950 text-sm font-semibold text-white">
-                {customer.avatarFallback}
-              </div>
+              {customer.avatarImageUrl ? (
+                <div className="relative h-14 w-14 overflow-hidden rounded-2xl bg-slate-100">
+                  <Image
+                    alt={customer.name}
+                    className="object-cover"
+                    fill
+                    sizes="56px"
+                    src={customer.avatarImageUrl}
+                    unoptimized
+                  />
+                </div>
+              ) : (
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-950 text-sm font-semibold text-white">
+                  {customer.avatarFallback}
+                </div>
+              )}
               <div className="min-w-0 space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="text-lg font-semibold text-slate-950 dark:text-slate-100">{customer.name}</h3>
@@ -83,7 +97,7 @@ export function CustomerDrawer({
                 {t("channels")}
               </h3>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Mock channel identities shared with the Inbox profile.
+                Channel identities shared with the Inbox profile.
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -115,7 +129,7 @@ export function CustomerDrawer({
                 {t("tag")}
               </h3>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Toggle the mock tags you want to keep on this customer.
+                Toggle the tags you want to keep on this customer.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">

@@ -1,3 +1,6 @@
+"use client";
+
+import Image from "next/image";
 import { CustomerOrdersPanel } from "@/features/orders/components/customer-orders-panel";
 import { classNames } from "@/lib/class-names";
 import { useState } from "react";
@@ -91,9 +94,22 @@ export default function CustomerPanel({
       ) : (
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-950 text-sm font-semibold text-white">
-              {activeCustomer.avatarFallback}
-            </div>
+            {activeCustomer.avatarImageUrl ? (
+              <div className="relative h-14 w-14 overflow-hidden rounded-2xl bg-slate-100">
+                <Image
+                  alt={activeCustomer.name}
+                  className="object-cover"
+                  fill
+                  sizes="56px"
+                  src={activeCustomer.avatarImageUrl}
+                  unoptimized
+                />
+              </div>
+            ) : (
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-950 text-sm font-semibold text-white">
+                {activeCustomer.avatarFallback}
+              </div>
+            )}
             <div>
               <p className="text-base font-semibold text-slate-950 dark:text-slate-100">
                 {activeCustomer.name}

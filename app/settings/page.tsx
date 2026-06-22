@@ -3,7 +3,7 @@ import { SettingsWorkspace } from "@/features/settings/components/settings-works
 
 export const metadata: Metadata = {
   title: "Settings | SuperChannel",
-  description: "Mock workspace settings for SuperChannel.",
+  description: "Workspace settings for SuperChannel.",
 };
 
 export default function SettingsPage() {

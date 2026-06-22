@@ -1,24 +1,15 @@
 import { NextResponse } from "next/server";
-import { getMockSession } from "@/server/auth/mock-session";
-import { testMockIntegration } from "@/server/integrations/mock-integrations-data";
 import type { IntegrationProvider } from "@/features/integrations/types/integrations";
+import { getAuthenticatedSession } from "@/server/auth/session";
+import { unauthorizedResponse } from "@/server/http/responses";
+import { testIntegrationInDatabase } from "@/server/services/integrations";
 
 type RouteContext = {
   params: Promise<{ provider: string }>;
 };
 
-function unauthorizedResponse() {
-  return NextResponse.json(
-    {
-      code: "UNAUTHORIZED",
-      message: "Your session has expired. Please sign in again.",
-    },
-    { status: 401 },
-  );
-}
-
 export async function POST(_: Request, context: RouteContext) {
-  const session = await getMockSession();
+  const session = await getAuthenticatedSession();
 
   if (!session) {
     return unauthorizedResponse();
@@ -26,12 +17,7 @@ export async function POST(_: Request, context: RouteContext) {
 
   const { provider } = await context.params;
 
-  await new Promise((resolve) => setTimeout(resolve, 300));
-
-  const result = await testMockIntegration(
-    session.id,
-    provider as IntegrationProvider,
-  );
+  const result = await testIntegrationInDatabase(session, provider as IntegrationProvider);
 
   if (!result) {
     return NextResponse.json(

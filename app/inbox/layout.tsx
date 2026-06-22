@@ -1,13 +1,13 @@
 import { redirect } from "next/navigation";
 import { AuthenticatedShell } from "@/features/inbox/components/authenticated-shell";
-import { getMockSession } from "@/server/auth/mock-session";
+import { getAuthenticatedSession } from "@/server/auth/session";
 
 export default async function InboxLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getMockSession();
+  const session = await getAuthenticatedSession();
 
   if (!session) {
     redirect("/login");

@@ -1,21 +1,16 @@
 import { NextResponse } from "next/server";
-import { getMockSession } from "@/server/auth/mock-session";
-import { listMockCustomers } from "@/server/customers/mock-customer-data";
+import { getAuthenticatedSession } from "@/server/auth/session";
+import { unauthorizedResponse } from "@/server/http/responses";
+import { listCustomersFromDatabase } from "@/server/services/customers";
 
 const allowedChannels = new Set(["Facebook", "Instagram", "LINE", "Telegram"]);
 const allowedStatuses = new Set(["open", "pending", "resolved"]);
 
 export async function GET(request: Request) {
-  const session = await getMockSession();
+  const session = await getAuthenticatedSession();
 
   if (!session) {
-    return NextResponse.json(
-      {
-        code: "UNAUTHORIZED",
-        message: "Your session has expired. Please sign in again.",
-      },
-      { status: 401 },
-    );
+    return unauthorizedResponse();
   }
 
   const { searchParams } = new URL(request.url);
@@ -24,9 +19,7 @@ export async function GET(request: Request) {
   const channel = searchParams.get("channel");
   const status = searchParams.get("status");
 
-  await new Promise((resolve) => setTimeout(resolve, 220));
-
-  const result = await listMockCustomers(session.id, {
+  const result = await listCustomersFromDatabase(session, {
     assignedAgent: searchParams.get("assignedAgent") ?? undefined,
     channel:
       channel && allowedChannels.has(channel)

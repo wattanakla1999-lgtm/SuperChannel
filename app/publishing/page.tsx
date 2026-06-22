@@ -3,7 +3,7 @@ import { PublishingWorkspace } from "@/features/publishing/components/publishing
 
 export const metadata: Metadata = {
   title: "Publishing | SuperChannel",
-  description: "Mock publishing workflow for SuperChannel.",
+  description: "Publishing workflow for SuperChannel.",
 };
 
 export default function PublishingPage() {

@@ -3,7 +3,7 @@ import { DashboardWorkspace } from "@/features/dashboard/components/dashboard-wo
 
 export const metadata: Metadata = {
   title: "Dashboard | SuperChannel",
-  description: "Mock analytics dashboard for SuperChannel.",
+  description: "Analytics dashboard for SuperChannel.",
 };
 
 export default function DashboardPage() {

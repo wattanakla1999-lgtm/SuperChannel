@@ -77,7 +77,7 @@ test.describe("dashboard", () => {
     expect(sidebarBox?.height).toBeLessThanOrEqual(700);
   });
 
-  test("KPI values, charts, and agent rows render from shared mock data", async ({
+  test("KPI values, charts, and agent rows render from shared data", async ({
     page,
   }) => {
     await loginAs(page);
@@ -235,7 +235,7 @@ test.describe("dashboard", () => {
     });
   }
 
-  test("agent users cannot access another agent's analytics through UI or mock API", async ({
+  test("agent users cannot access another agent's analytics through UI or API", async ({
     page,
   }) => {
     await loginAs(page, "agent@superchannel.local");

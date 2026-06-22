@@ -1,21 +1,18 @@
 import { NextResponse } from "next/server";
-import { getMockAssignmentMetrics } from "@/server/customers/mock-customer-data";
-import { getMockSession } from "@/server/auth/mock-session";
-import { buildMockTeamList } from "@/server/team/mock-team-data";
 import type { TeamAccountStatus, TeamPresence, TeamRole } from "@/features/team/types/team";
+import { getAuthenticatedSession } from "@/server/auth/session";
+import { unauthorizedResponse } from "@/server/http/responses";
+import { buildTeamListFromDatabase } from "@/server/services/team";
 
 const roles = new Set(["Owner", "Admin", "Supervisor", "Agent"]);
 const onlineStatuses = new Set(["online", "away", "offline"]);
 const accountStatuses = new Set(["active", "inactive"]);
 
 export async function GET(request: Request) {
-  const session = await getMockSession();
+  const session = await getAuthenticatedSession();
 
   if (!session) {
-    return NextResponse.json(
-      { code: "UNAUTHORIZED", message: "Your session has expired. Please sign in again." },
-      { status: 401 },
-    );
+    return unauthorizedResponse();
   }
 
   const { searchParams } = new URL(request.url);
@@ -25,17 +22,13 @@ export async function GET(request: Request) {
   const onlineStatus = searchParams.get("onlineStatus");
   const accountStatus = searchParams.get("accountStatus");
 
-  await new Promise((resolve) => setTimeout(resolve, 220));
-
   return NextResponse.json(
-    buildMockTeamList(
-      session.id,
-      session.accountId,
-      session.user.role as TeamRole,
+    await buildTeamListFromDatabase(
+      session,
       {
         accountStatus:
           accountStatus && accountStatuses.has(accountStatus)
-            ? (accountStatus as TeamAccountStatus)
+            ? (accountStatus as Exclude<TeamAccountStatus, "invited">)
             : "all",
         onlineStatus:
           onlineStatus && onlineStatuses.has(onlineStatus)
@@ -50,7 +43,6 @@ export async function GET(request: Request) {
         search: searchParams.get("search") ?? undefined,
         team: searchParams.get("team") ?? undefined,
       },
-      getMockAssignmentMetrics(session.id),
     ),
   );
 }

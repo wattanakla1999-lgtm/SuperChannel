@@ -22,7 +22,7 @@ test.describe("inbox", () => {
     ).toBeVisible();
   });
 
-  test("conversation list and mock channels render", async ({ page }) => {
+  test("conversation list and channels render", async ({ page }) => {
     await login(page);
 
     await expect(page.getByTestId("conversation-list")).toBeVisible();
@@ -73,7 +73,7 @@ test.describe("inbox", () => {
     await expect(page.getByTestId("conversation-item-conv-line-001")).toHaveCount(0);
   });
 
-  test("sending a mock message shows loading and appends the message once", async ({
+  test("sending a message shows loading and appends the message once", async ({
     page,
   }) => {
     await login(page);
@@ -249,7 +249,7 @@ test.describe("inbox", () => {
     });
   });
 
-  test("orders retry flow recovers from a temporary mock API failure", async ({
+  test("orders retry flow recovers from a temporary API failure", async ({
     page,
   }) => {
     await login(page);

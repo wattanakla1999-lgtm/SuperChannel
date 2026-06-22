@@ -21,7 +21,7 @@ import {
   publishExistingPost,
 } from "../services/publishing-service";
 import type {
-  MockMediaAsset,
+  MediaAsset,
   PublishingChannel,
   PublishingCreateInput,
   PublishingPost,
@@ -38,18 +38,18 @@ const channelOptions: PublishingChannel[] = [
   "TikTok",
 ];
 
-const mockMediaOptions: MockMediaAsset[] = [
+const mediaOptions: MediaAsset[] = [
   { accent: "from-pink-200 via-orange-100 to-amber-100", id: "launch-grid", label: "Launch grid" },
   { accent: "from-cyan-200 via-sky-100 to-indigo-100", id: "event-card", label: "Event card" },
   { accent: "from-emerald-200 via-lime-100 to-teal-100", id: "promo-banner", label: "Promo banner" },
 ];
 
 const channelLimitationCopy: Record<PublishingChannel, string> = {
-  Facebook: "Facebook mock preview truncates long captions after two lines.",
-  Instagram: "Instagram mock preview assumes square-crop media placement.",
-  Telegram: "Telegram mock posts render link-free text only in this demo.",
-  TikTok: "TikTok mock warns on long captions and only supports mock media metadata.",
-  X: "X mock preview emphasizes short-form copy and compact media cards.",
+  Facebook: "Facebook previews may truncate long captions after two lines.",
+  Instagram: "Instagram previews assume square-crop media placement.",
+  Telegram: "Telegram previews show text-only content in this workspace.",
+  TikTok: "TikTok previews warn on long captions and use uploaded media metadata.",
+  X: "X previews emphasize short-form copy and compact media cards.",
 };
 
 function formatDateTime(value: string | null) {
@@ -244,7 +244,7 @@ export function PublishingWorkspace() {
   }, [activeTab, channelFilter, posts, searchTerm]);
 
   const selectedMedia =
-    mockMediaOptions.find((option) => option.id === selectedMediaId) ?? null;
+    mediaOptions.find((option) => option.id === selectedMediaId) ?? null;
 
   const resetComposer = () => {
     setCaption("");
@@ -316,7 +316,7 @@ export function PublishingWorkspace() {
           : post.status === "scheduled"
             ? "Post scheduled"
             : post.status === "failed"
-              ? "Post saved with mock failure"
+              ? "Post saved with failed targets"
               : "Post published",
       );
     } catch (error) {
@@ -345,7 +345,7 @@ export function PublishingWorkspace() {
       setToastTone(post.status === "failed" ? "error" : "success");
       setToastMessage(
         post.status === "failed"
-          ? "Post saved with mock failure"
+          ? "Post saved with failed targets"
           : "Post published",
       );
     } catch (error) {
@@ -473,7 +473,7 @@ export function PublishingWorkspace() {
                           ))}
                         </div>
                         <p className="max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-300">
-                          {post.caption || "Mock media-only post"}
+                          {post.caption || "Media-only post"}
                         </p>
                         <div className="flex flex-wrap gap-4 text-xs text-slate-500 dark:text-slate-400">
                           <span>{post.scheduledFor ? format.dateTime(new Date(post.scheduledFor), { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Bangkok" }) : t("publishNow")}</span>
@@ -545,7 +545,7 @@ export function PublishingWorkspace() {
             <section className="space-y-3">
               <p className="text-sm font-semibold text-slate-950 dark:text-slate-100">{t("media")}</p>
               <div className="grid gap-3 sm:grid-cols-3">
-                {mockMediaOptions.map((option) => (
+                {mediaOptions.map((option) => (
                   <button
                     key={option.id}
                     type="button"
@@ -658,7 +658,7 @@ export function PublishingWorkspace() {
                   )}
                 />
                 <p className="text-sm leading-6 text-slate-700 dark:text-slate-300">
-                  {caption || "Start writing to preview your mock post."}
+                  {caption || "Start writing to preview your post."}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {(selectedChannels.length

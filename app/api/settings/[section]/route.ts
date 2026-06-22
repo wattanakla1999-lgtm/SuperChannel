@@ -5,13 +5,14 @@ import type {
   NotificationsInput,
   WorkspaceProfileInput,
 } from "@/features/settings/types/settings";
-import { getMockSession } from "@/server/auth/mock-session";
+import { getAuthenticatedSession } from "@/server/auth/session";
+import { unauthorizedResponse } from "@/server/http/responses";
 import {
-  updateMockBusinessHours,
-  updateMockInboxPreferences,
-  updateMockNotifications,
-  updateMockWorkspaceProfile,
-} from "@/server/settings/mock-settings-data";
+  updateBusinessHoursInDatabase,
+  updateInboxPreferencesInDatabase,
+  updateNotificationsInDatabase,
+  updateWorkspaceProfileInDatabase,
+} from "@/server/services/settings";
 
 type RouteContext = {
   params: Promise<{ section: string }>;
@@ -33,16 +34,10 @@ function toErrorResponse(error: unknown) {
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
-  const session = await getMockSession();
+  const session = await getAuthenticatedSession();
 
   if (!session) {
-    return NextResponse.json(
-      {
-        code: "UNAUTHORIZED",
-        message: "Your session has expired. Please sign in again.",
-      },
-      { status: 401 },
-    );
+    return unauthorizedResponse();
   }
 
   const { section } = await context.params;
@@ -60,18 +55,16 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
 
-  await new Promise((resolve) => setTimeout(resolve, 240));
-
   try {
     switch (section) {
       case "workspace-profile":
-        return NextResponse.json(updateMockWorkspaceProfile(session.id, session.user, body as WorkspaceProfileInput));
+        return NextResponse.json(await updateWorkspaceProfileInDatabase(session, body as WorkspaceProfileInput));
       case "business-hours":
-        return NextResponse.json(updateMockBusinessHours(session.id, session.user, body as BusinessHoursInput));
+        return NextResponse.json(await updateBusinessHoursInDatabase(session, body as BusinessHoursInput));
       case "inbox-preferences":
-        return NextResponse.json(updateMockInboxPreferences(session.id, session.user, body as InboxPreferencesInput));
+        return NextResponse.json(await updateInboxPreferencesInDatabase(session, body as InboxPreferencesInput));
       case "notifications":
-        return NextResponse.json(updateMockNotifications(session.id, session.user, body as NotificationsInput));
+        return NextResponse.json(await updateNotificationsInDatabase(session, body as NotificationsInput));
       default:
         return NextResponse.json(
           { code: "NOT_FOUND", message: "Settings section not found." },

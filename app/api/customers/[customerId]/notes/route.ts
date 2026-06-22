@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getMockSession } from "@/server/auth/mock-session";
-import { addMockCustomerNote } from "@/server/customers/mock-customer-data";
+import { getAuthenticatedSession } from "@/server/auth/session";
+import { invalidRequestResponse, unauthorizedResponse } from "@/server/http/responses";
+import { addCustomerNoteFromDatabase } from "@/server/services/customers";
 
 type RouteContext = {
   params: Promise<{
@@ -13,39 +14,20 @@ type AddNoteBody = {
 };
 
 export async function POST(request: Request, context: RouteContext) {
-  const session = await getMockSession();
+  const session = await getAuthenticatedSession();
 
   if (!session) {
-    return NextResponse.json(
-      {
-        code: "UNAUTHORIZED",
-        message: "Your session has expired. Please sign in again.",
-      },
-      { status: 401 },
-    );
+    return unauthorizedResponse();
   }
 
   const body = (await request.json().catch(() => null)) as AddNoteBody | null;
 
   if (!body || typeof body.body !== "string" || !body.body.trim()) {
-    return NextResponse.json(
-      {
-        code: "INVALID_REQUEST",
-        message: "Enter a note before saving.",
-      },
-      { status: 400 },
-    );
+    return invalidRequestResponse("Enter a note before saving.");
   }
 
   const { customerId } = await context.params;
-
-  await new Promise((resolve) => setTimeout(resolve, 220));
-
-  const customer = await addMockCustomerNote(
-    session.id,
-    customerId,
-    body.body.trim(),
-  );
+  const customer = await addCustomerNoteFromDatabase(session, customerId, body.body.trim());
 
   if (!customer) {
     return NextResponse.json(

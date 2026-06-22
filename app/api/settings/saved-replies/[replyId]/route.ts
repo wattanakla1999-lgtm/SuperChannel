@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import type { SavedReplyInput } from "@/features/settings/types/settings";
-import { getMockSession } from "@/server/auth/mock-session";
+import { getAuthenticatedSession } from "@/server/auth/session";
+import { unauthorizedResponse } from "@/server/http/responses";
 import {
-  deleteMockSavedReply,
-  updateMockSavedReply,
-} from "@/server/settings/mock-settings-data";
+  deleteSavedReplyInDatabase,
+  updateSavedReplyInDatabase,
+} from "@/server/services/settings";
 
 type RouteContext = {
   params: Promise<{ replyId: string }>;
@@ -30,16 +31,10 @@ function toErrorResponse(error: unknown) {
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
-  const session = await getMockSession();
+  const session = await getAuthenticatedSession();
 
   if (!session) {
-    return NextResponse.json(
-      {
-        code: "UNAUTHORIZED",
-        message: "Your session has expired. Please sign in again.",
-      },
-      { status: 401 },
-    );
+    return unauthorizedResponse();
   }
 
   const body = (await request.json().catch(() => null)) as SavedReplyInput | null;
@@ -53,10 +48,8 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const { replyId } = await context.params;
 
-  await new Promise((resolve) => setTimeout(resolve, 180));
-
   try {
-    const reply = updateMockSavedReply(session.id, session.user, replyId, body);
+    const reply = await updateSavedReplyInDatabase(session, replyId, body);
 
     if (!reply) {
       return NextResponse.json(
@@ -72,24 +65,16 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(_: Request, context: RouteContext) {
-  const session = await getMockSession();
+  const session = await getAuthenticatedSession();
 
   if (!session) {
-    return NextResponse.json(
-      {
-        code: "UNAUTHORIZED",
-        message: "Your session has expired. Please sign in again.",
-      },
-      { status: 401 },
-    );
+    return unauthorizedResponse();
   }
 
   const { replyId } = await context.params;
 
-  await new Promise((resolve) => setTimeout(resolve, 180));
-
   try {
-    const deleted = deleteMockSavedReply(session.id, session.user, replyId);
+    const deleted = await deleteSavedReplyInDatabase(session, replyId);
 
     if (!deleted) {
       return NextResponse.json(

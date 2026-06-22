@@ -111,7 +111,7 @@ test.describe("customers", () => {
     await expect(page.getByTestId("open-conversation-button")).toBeEnabled();
   });
 
-  test("updating tags and notes persists in the mock UI", async ({ page }) => {
+  test("updating tags and notes persists in the UI", async ({ page }) => {
     await login(page);
     await page.goto("/customers");
 

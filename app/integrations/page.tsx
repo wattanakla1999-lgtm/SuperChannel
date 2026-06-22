@@ -3,7 +3,7 @@ import { IntegrationsWorkspace } from "@/features/integrations/components/integr
 
 export const metadata: Metadata = {
   title: "Integrations | SuperChannel",
-  description: "Mock integration management for SuperChannel.",
+  description: "Integration management for SuperChannel.",
 };
 
 export default function IntegrationsPage() {

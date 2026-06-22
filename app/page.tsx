@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
-import { getMockSession } from "@/server/auth/mock-session";
+import { getAuthenticatedSession } from "@/server/auth/session";
 
 export default async function Home() {
-  const session = await getMockSession();
+  const session = await getAuthenticatedSession();
 
   if (session) {
     redirect("/inbox");

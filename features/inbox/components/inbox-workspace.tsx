@@ -1,7 +1,7 @@
 "use client";
 
+import Image from "next/image";
 import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Spinner } from "@/components/ui/spinner";
@@ -15,6 +15,7 @@ import {
   useState,
   useSyncExternalStore,
   type CSSProperties,
+  type ChangeEvent,
   type KeyboardEvent,
   type PointerEvent,
 } from "react";
@@ -22,6 +23,7 @@ import {
   getConversation,
   getConversations,
   getSavedReplies,
+  sendConversationImage,
   sendConversationMessage,
 } from "../services/inbox-service";
 import {
@@ -45,6 +47,8 @@ import MessageBubble from "./MessageBubble";
 import PanelResizeDivider from "./PanelResizeDivider";
 
 const filters: ConversationStatus[] = ["all", "unread", "open", "pending", "resolved"];
+const LIST_POLL_INTERVAL_MS = 4_000;
+const DETAIL_POLL_INTERVAL_MS = 3_000;
 
 const channelClasses: Record<InboxChannel, string> = {
   Facebook: "bg-blue-100 text-blue-700",
@@ -52,6 +56,97 @@ const channelClasses: Record<InboxChannel, string> = {
   LINE: "bg-emerald-100 text-emerald-700",
   Telegram: "bg-sky-100 text-sky-700",
 };
+
+function ImageAttachIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-5 w-5"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <path
+        d="M4.75 6.75A2.25 2.25 0 0 1 7 4.5h10A2.25 2.25 0 0 1 19.25 6.75v10A2.25 2.25 0 0 1 17 19H7A2.25 2.25 0 0 1 4.75 16.75z"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+      <path
+        d="m6.75 15.75 3.8-3.8a1 1 0 0 1 1.42 0l1.78 1.78a1 1 0 0 0 1.42 0l2.08-2.08"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+      <circle cx="9" cy="9" r="1.25" fill="currentColor" />
+    </svg>
+  );
+}
+
+function SavedReplyIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4.5 w-4.5"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <path
+        d="M7.75 8.75h8.5M7.75 12h6.5M6.75 4.75h10.5a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2H12l-3.75 3v-3H6.75a2 2 0 0 1-2-2v-7.5a2 2 0 0 1 2-2Z"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.7"
+      />
+    </svg>
+  );
+}
+
+function SendIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-5 w-5"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <path
+        d="M21 3 10 14"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+      <path
+        d="m21 3-7 18-4-7-7-4 18-7Z"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <path
+        d="m7 7 10 10M17 7 7 17"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+      />
+    </svg>
+  );
+}
 
 
 function clamp(value: number, minimum: number, maximum: number) {
@@ -140,6 +235,10 @@ export function InboxWorkspace({
     Boolean(initialConversationId),
   );
   const [isCustomerDrawerOpen, setIsCustomerDrawerOpen] = useState(false);
+  const [pendingImage, setPendingImage] = useState<{
+    file: File;
+    previewUrl: string;
+  } | null>(null);
   const [panelWidths, setPanelWidths] = useState<PanelWidths>(DEFAULT_PANEL_WIDTHS);
   const [arePanelWidthsLoaded, setArePanelWidthsLoaded] = useState(false);
   const [activeDivider, setActiveDivider] = useState<PanelSide | null>(null);
@@ -150,6 +249,10 @@ export function InboxWorkspace({
     startX: number;
     startWidth: number;
   } | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const messageThreadRef = useRef<HTMLDivElement>(null);
+  const selectedConversationIdRef = useRef<string | null>(null);
+  const isSendingRef = useRef(false);
   const isHydrated = useSyncExternalStore(
     () => () => undefined,
     () => true,
@@ -369,6 +472,14 @@ export function InboxWorkspace({
       )?.id ?? visibleConversations[0].id;
 
   useEffect(() => {
+    selectedConversationIdRef.current = selectedConversationId;
+  }, [selectedConversationId]);
+
+  useEffect(() => {
+    isSendingRef.current = isSending;
+  }, [isSending]);
+
+  useEffect(() => {
     if (!selectedConversationId) {
       return;
     }
@@ -389,6 +500,13 @@ export function InboxWorkspace({
         }
 
         setActiveDetail(detail);
+        setConversations((current) =>
+          current.map((conversation) =>
+            conversation.id === detail.conversation.id
+              ? detail.conversation
+              : conversation,
+          ),
+        );
       } catch (error) {
         if (!isMounted) {
           return;
@@ -413,6 +531,139 @@ export function InboxWorkspace({
     };
   }, [selectedConversationId, t, tCommon]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    async function refreshConversations() {
+      if (document.hidden) {
+        return;
+      }
+
+      try {
+        const nextConversations = await getConversations();
+
+        if (!isMounted) {
+          return;
+        }
+
+        setConversations(nextConversations);
+        setActiveConversationId((current) => {
+          if (
+            current &&
+            nextConversations.some((conversation) => conversation.id === current)
+          ) {
+            return current;
+          }
+
+          if (
+            initialConversationId &&
+            nextConversations.some(
+              (conversation) => conversation.id === initialConversationId,
+            )
+          ) {
+            return initialConversationId;
+          }
+
+          return nextConversations[0]?.id ?? null;
+        });
+        setListError(null);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setListError(
+          isUnauthorized(error)
+            ? tCommon("sessionExpired")
+            : t("loadError"),
+        );
+      }
+    }
+
+    const intervalId = window.setInterval(() => {
+      void refreshConversations();
+    }, LIST_POLL_INTERVAL_MS);
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        void refreshConversations();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [initialConversationId, t, tCommon]);
+
+  useEffect(() => {
+    if (!selectedConversationId) {
+      return;
+    }
+
+    let isMounted = true;
+
+    async function refreshConversationDetail() {
+      if (document.hidden || isSendingRef.current) {
+        return;
+      }
+
+      const currentConversationId = selectedConversationIdRef.current;
+      if (!currentConversationId) {
+        return;
+      }
+
+      try {
+        const detail = await getConversation(currentConversationId);
+
+        if (!isMounted || selectedConversationIdRef.current !== currentConversationId) {
+          return;
+        }
+
+        setActiveDetail(detail);
+        setConversations((current) =>
+          current.map((conversation) =>
+            conversation.id === detail.conversation.id
+              ? detail.conversation
+              : conversation,
+          ),
+        );
+        setDetailError(null);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setDetailError(
+          isUnauthorized(error)
+            ? tCommon("sessionExpired")
+            : t("conversationError"),
+        );
+      }
+    }
+
+    const intervalId = window.setInterval(() => {
+      void refreshConversationDetail();
+    }, DETAIL_POLL_INTERVAL_MS);
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        void refreshConversationDetail();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [selectedConversationId, t, tCommon]);
+
   const handleSelectConversation = (conversationId: string) => {
     setActiveConversationId(conversationId);
     setIsMobileDetailOpen(true);
@@ -420,7 +671,9 @@ export function InboxWorkspace({
   };
 
   const handleSendMessage = async () => {
-    if (!selectedConversationId || !messageDraft.trim() || isSending) {
+    const trimmedMessage = messageDraft.trim();
+
+    if (!selectedConversationId || (!trimmedMessage && !pendingImage) || isSending) {
       return;
     }
 
@@ -428,31 +681,48 @@ export function InboxWorkspace({
     setIsSending(true);
 
     try {
-      const result = await sendConversationMessage(selectedConversationId, {
-        body: messageDraft,
-      });
+      const applySendResult = (
+        result: Awaited<ReturnType<typeof sendConversationMessage>>,
+      ) => {
+        setConversations((current) =>
+          current
+            .map((conversation) =>
+              conversation.id === selectedConversationId
+                ? result.conversation
+                : conversation,
+            )
+            .sort((left, right) =>
+              right.lastMessageAt.localeCompare(left.lastMessageAt),
+            ),
+        );
 
-      setConversations((current) =>
-        current
-          .map((conversation) =>
-            conversation.id === selectedConversationId
-              ? result.conversation
-              : conversation,
-          )
-          .sort((left, right) =>
-            right.lastMessageAt.localeCompare(left.lastMessageAt),
-          ),
-      );
+        setActiveDetail((current) =>
+          current && current.conversation.id === selectedConversationId
+            ? {
+                ...current,
+                conversation: result.conversation,
+                messages: [...current.messages, result.message],
+              }
+            : current,
+        );
+      };
 
-      setActiveDetail((current) =>
-        current && current.conversation.id === selectedConversationId
-          ? {
-              ...current,
-              conversation: result.conversation,
-              messages: [...current.messages, result.message],
-            }
-          : current,
-      );
+      if (pendingImage) {
+        applySendResult(
+          await sendConversationImage(selectedConversationId, pendingImage.file),
+        );
+        URL.revokeObjectURL(pendingImage.previewUrl);
+        setPendingImage(null);
+      }
+
+      if (trimmedMessage) {
+        applySendResult(
+          await sendConversationMessage(selectedConversationId, {
+            body: trimmedMessage,
+          }),
+        );
+      }
+
       setMessageDraft("");
     } catch (error) {
       setComposerError(
@@ -463,6 +733,43 @@ export function InboxWorkspace({
     } finally {
       setIsSending(false);
     }
+  };
+
+  const handleImageSelection = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setComposerError(t("imageOnlyError"));
+      event.target.value = "";
+      return;
+    }
+
+    setComposerError(null);
+    setPendingImage((current) => {
+      if (current) {
+        URL.revokeObjectURL(current.previewUrl);
+      }
+
+      return {
+        file,
+        previewUrl: URL.createObjectURL(file),
+      };
+    });
+    event.target.value = "";
+  };
+
+  const handleRemovePendingImage = () => {
+    setPendingImage((current) => {
+      if (current) {
+        URL.revokeObjectURL(current.previewUrl);
+      }
+
+      return null;
+    });
   };
 
   const handleOpenSavedReplies = async () => {
@@ -500,6 +807,7 @@ export function InboxWorkspace({
     activeConversation && activeDetail?.conversation.id === selectedConversationId
       ? activeDetail.messages
       : [];
+  const latestMessageId = activeMessages[activeMessages.length - 1]?.id ?? null;
   const areFiltersInteractive = isHydrated && !isListLoading;
   const normalizedSavedReplySearch = savedReplySearch.trim().toLowerCase();
   const visibleSavedReplies = savedReplies.filter((reply) => {
@@ -514,6 +822,28 @@ export function InboxWorkspace({
       reply.message.toLowerCase().includes(normalizedSavedReplySearch)
     );
   });
+
+  useEffect(() => {
+    const messageThread = messageThreadRef.current;
+
+    if (!messageThread || !activeConversation) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      messageThread.scrollTop = messageThread.scrollHeight;
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [activeConversation, latestMessageId, activeMessages.length]);
+
+  useEffect(() => {
+    return () => {
+      if (pendingImage) {
+        URL.revokeObjectURL(pendingImage.previewUrl);
+      }
+    };
+  }, [pendingImage]);
 
   return (
     <main
@@ -586,27 +916,48 @@ export function InboxWorkspace({
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {visibleConversations.map((conversation) => (
-                    <button
-                      key={conversation.id}
-                      type="button"
-                      data-testid={`conversation-item-${conversation.id}`}
-                      className={classNames(
-                        "w-full rounded-[1.5rem] border px-4 py-4 text-left transition",
-                        selectedConversationId === conversation.id
-                          ? "border-cyan-200 bg-cyan-50 dark:border-cyan-700 dark:bg-cyan-950/30"
-                          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700 dark:hover:bg-slate-900",
-                      )}
-                      onClick={() => handleSelectConversation(conversation.id)}
-                    >
+                  {visibleConversations.map((conversation) => {
+                    const isUnread = conversation.unreadCount > 0;
+
+                    return (
+                      <button
+                        key={conversation.id}
+                        type="button"
+                        data-testid={`conversation-item-${conversation.id}`}
+                        className={classNames(
+                          "w-full rounded-[1.5rem] border px-4 py-4 text-left transition",
+                          selectedConversationId === conversation.id
+                            ? "border-cyan-200 bg-cyan-50 dark:border-cyan-700 dark:bg-cyan-950/30"
+                            : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700 dark:hover:bg-slate-900",
+                        )}
+                        onClick={() => handleSelectConversation(conversation.id)}
+                      >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex min-w-0 gap-3">
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-sm font-semibold text-white">
-                            {conversation.customerAvatarFallback}
-                          </div>
+                          {conversation.customerAvatarImageUrl ? (
+                            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl bg-slate-100">
+                              <Image
+                                alt={conversation.customerName}
+                                className="object-cover"
+                                fill
+                                sizes="44px"
+                                src={conversation.customerAvatarImageUrl}
+                                unoptimized
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-sm font-semibold text-white">
+                              {conversation.customerAvatarFallback}
+                            </div>
+                          )}
                           <div className="min-w-0 space-y-1">
                             <div className="flex items-center gap-2">
-                              <p className="truncate text-sm font-semibold text-slate-950 dark:text-slate-100">
+                              <p
+                                className={classNames(
+                                  "truncate text-sm text-slate-950 dark:text-slate-100",
+                                  isUnread ? "font-extrabold" : "font-semibold",
+                                )}
+                              >
                                 {conversation.customerName}
                               </p>
                               <span
@@ -618,13 +969,27 @@ export function InboxWorkspace({
                                 {conversation.channel}
                               </span>
                             </div>
-                            <p className="line-clamp-2 text-sm text-slate-600 dark:text-slate-400">
+                            <p
+                              className={classNames(
+                                "line-clamp-2 text-sm dark:text-slate-400",
+                                isUnread
+                                  ? "font-bold text-slate-900 dark:text-slate-100"
+                                  : "text-slate-600",
+                              )}
+                            >
                               {conversation.preview}
                             </p>
                           </div>
                         </div>
                         <div className="shrink-0 text-right">
-                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                          <p
+                            className={classNames(
+                              "text-xs dark:text-slate-400",
+                              isUnread
+                                ? "font-bold text-slate-700 dark:text-slate-200"
+                                : "text-slate-500",
+                            )}
+                          >
                             {formatTimestamp(conversation.lastMessageAt)}
                           </p>
                           {conversation.unreadCount > 0 ? (
@@ -634,8 +999,9 @@ export function InboxWorkspace({
                           ) : null}
                         </div>
                       </div>
-                    </button>
-                  ))}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -706,6 +1072,7 @@ export function InboxWorkspace({
             ) : (
               <>
                 <div
+                  ref={messageThreadRef}
                   data-testid="message-thread"
                   className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-4 dark:bg-[linear-gradient(180deg,#020617_0%,#0f172a_100%)]"
                 >
@@ -714,43 +1081,103 @@ export function InboxWorkspace({
                   ))}
                 </div>
 
-                <div className="border-t border-slate-200 p-4 dark:border-slate-800">
+                <div className="border-t border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-950/80">
                   {composerError ? (
                     <div className="mb-3">
                       <Alert tone="error">{composerError}</Alert>
                     </div>
                   ) : null}
-                  <div className="flex flex-col gap-3">
-                    <textarea
-                      data-testid="message-input"
-                      className="min-h-28 rounded-[1.25rem] border border-slate-200 px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus-visible:border-slate-400 focus-visible:ring-2 focus-visible:ring-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus-visible:border-cyan-500 dark:focus-visible:ring-slate-800"
-                      placeholder={t("replyPlaceholder")}
-                      value={messageDraft}
-                      onChange={(event) => setMessageDraft(event.target.value)}
-                      disabled={!activeConversation || isSending}
+                  <div className="rounded-[1.75rem] border border-slate-200 bg-white p-3 shadow-[0_18px_50px_-30px_rgba(15,23,42,0.45)] dark:border-slate-800 dark:bg-slate-900">
+                    <input
+                      ref={imageInputRef}
+                      accept="image/*"
+                      className="hidden"
+                      type="file"
+                      onChange={handleImageSelection}
                     />
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {t("mockStorage")}
-                      </p>
-                      <div className="flex flex-wrap items-center justify-end gap-3">
-                        <Button
-                          className="w-auto"
-                          onClick={() => void handleOpenSavedReplies()}
-                          variant="secondary"
-                        >
-                          {t("savedReplies")}
-                        </Button>
-                        <Button
-                          data-testid="send-message-button"
-                          className="w-auto min-w-36"
-                          loading={isSending}
-                          onClick={handleSendMessage}
-                          disabled={!activeConversation || !messageDraft.trim()}
-                        >
-                          {isSending ? t("sending") : t("send")}
-                        </Button>
+                    {pendingImage ? (
+                      <div className="mb-3 flex items-center gap-3 rounded-[1.4rem] bg-slate-50 p-3 ring-1 ring-slate-200 dark:bg-slate-950 dark:ring-slate-800">
+                        <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[1.1rem] bg-slate-200 dark:bg-slate-800">
+                          <Image
+                            alt={pendingImage.file.name}
+                            className="object-cover"
+                            fill
+                            sizes="64px"
+                            src={pendingImage.previewUrl}
+                            unoptimized
+                          />
+                          <button
+                            aria-label={t("removeImage")}
+                            className="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-950/75 text-white backdrop-blur transition hover:bg-slate-950 dark:bg-slate-100/85 dark:text-slate-950 dark:hover:bg-white"
+                            type="button"
+                            onClick={handleRemovePendingImage}
+                          >
+                            <CloseIcon />
+                          </button>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                            {pendingImage.file.name}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            {t("imageReady")}
+                          </p>
+                        </div>
                       </div>
+                    ) : null}
+                    <div className="flex items-end gap-3">
+                      <div className="flex min-w-0 flex-1 flex-col gap-3">
+                        <div className="overflow-hidden rounded-[1.6rem] bg-slate-100 ring-1 ring-slate-200 transition focus-within:ring-2 focus-within:ring-blue-300 dark:bg-slate-950 dark:ring-slate-800 dark:focus-within:ring-cyan-500/60">
+                          <textarea
+                            data-testid="message-input"
+                            className="min-h-24 w-full resize-none bg-transparent px-5 py-4 text-[15px] leading-6 text-slate-950 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
+                            placeholder={t("replyPlaceholder")}
+                            value={messageDraft}
+                            onChange={(event) => setMessageDraft(event.target.value)}
+                            disabled={!activeConversation || isSending}
+                          />
+                        </div>
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <button
+                              aria-label={t("attachImage")}
+                              className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-blue-600 ring-1 ring-blue-100 transition hover:bg-blue-100 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-cyan-500/10 dark:text-cyan-300 dark:ring-cyan-500/20 dark:hover:bg-cyan-500/20"
+                              disabled={!activeConversation || isSending}
+                              title={t("attachImage")}
+                              type="button"
+                              onClick={() => imageInputRef.current?.click()}
+                            >
+                              <ImageAttachIcon />
+                            </button>
+                            <button
+                              className="inline-flex h-11 items-center gap-2 rounded-full bg-slate-100 px-4 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-700"
+                              type="button"
+                              onClick={() => void handleOpenSavedReplies()}
+                            >
+                              <SavedReplyIcon />
+                              <span>{t("savedReplies")}</span>
+                            </button>
+                          </div>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                            {t("storageNotice")}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        aria-label={isSending ? t("sending") : t("send")}
+                        data-testid="send-message-button"
+                        className={classNames(
+                          "inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full shadow-lg shadow-cyan-500/20 transition",
+                          !activeConversation || (!messageDraft.trim() && !pendingImage)
+                            ? "cursor-not-allowed bg-slate-300 text-slate-500 dark:bg-slate-800 dark:text-slate-600"
+                            : "bg-gradient-to-br from-sky-500 to-cyan-500 text-white hover:from-sky-400 hover:to-cyan-400 dark:text-slate-950",
+                        )}
+                        disabled={!activeConversation || (!messageDraft.trim() && !pendingImage) || isSending}
+                        type="button"
+                        onClick={handleSendMessage}
+                      >
+                        {isSending ? <Spinner className="text-current" /> : <SendIcon />}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -831,9 +1258,3 @@ export function InboxWorkspace({
     </main>
   );
 }
-
-
-
-
-
-

@@ -179,7 +179,7 @@ test.describe("team", () => {
     ).toBeVisible();
   });
 
-  test("authorized role and team updates persist in mock state", async ({ browser }) => {
+  test("authorized role and team updates persist in saved state", async ({ browser }) => {
     const { context, page } = await openMobileTeamPage(browser);
 
     await page.getByTestId("team-search").fill("Jules Carter");
@@ -239,7 +239,7 @@ test.describe("team", () => {
     await context.close();
   });
 
-  test("read-only roles cannot mutate members through the UI or mock API", async ({
+  test("read-only roles cannot mutate members through the UI or API", async ({
     browser,
   }) => {
     const { context, page } = await openMobileTeamPage(

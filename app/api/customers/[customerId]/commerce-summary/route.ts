@@ -1,23 +1,14 @@
 import { NextResponse } from "next/server";
-import { getMockSession } from "@/server/auth/mock-session";
-import { getMockSettings } from "@/server/settings/mock-settings-data";
-import { getMockCommerceSummary } from "@/server/orders/mock-order-data";
+import { getAuthenticatedSession } from "@/server/auth/session";
+import { unauthorizedResponse } from "@/server/http/responses";
+import { getCommerceSummaryFromDatabase } from "@/server/services/orders";
+import { getSettingsFromDatabase } from "@/server/services/settings";
 
 type RouteContext = {
   params: Promise<{
     customerId: string;
   }>;
 };
-
-function unauthorizedResponse() {
-  return NextResponse.json(
-    {
-      code: "UNAUTHORIZED",
-      message: "Your session has expired. Please sign in again.",
-    },
-    { status: 401 },
-  );
-}
 
 function errorResponse(error: unknown) {
   if (!(error instanceof Error)) {
@@ -42,19 +33,17 @@ function errorResponse(error: unknown) {
 }
 
 export async function GET(_: Request, context: RouteContext) {
-  const session = await getMockSession();
+  const session = await getAuthenticatedSession();
 
   if (!session) {
     return unauthorizedResponse();
   }
 
   const { customerId } = await context.params;
-  const timezone = getMockSettings(session.id, session.user).workspaceProfile.timezone;
-
-  await new Promise((resolve) => setTimeout(resolve, 180));
+  const timezone = (await getSettingsFromDatabase(session)).workspaceProfile.timezone;
 
   try {
-    const summary = await getMockCommerceSummary(session.id, customerId, timezone);
+    const summary = await getCommerceSummaryFromDatabase(session, customerId, timezone);
     return NextResponse.json(summary);
   } catch (error) {
     return errorResponse(error);

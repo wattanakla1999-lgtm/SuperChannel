@@ -851,8 +851,8 @@ export function TeamWorkspace() {
         <div className="space-y-5">
           <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
             {confirmAction === "remove"
-              ? "This removes the member from the mock workspace. Ownership and self-removal rules are still enforced on the API."
-              : "This marks the member inactive in the mock workspace and updates shared assignment labels in Inbox and Customers."}
+              ? "This removes the member from the workspace. Ownership and self-removal rules are still enforced on the API."
+              : "This marks the member inactive in the workspace and updates shared assignment labels in Inbox and Customers."}
           </p>
           <div className="flex justify-end gap-3">
             <Button className="w-auto" onClick={() => setConfirmAction(null)} variant="secondary">

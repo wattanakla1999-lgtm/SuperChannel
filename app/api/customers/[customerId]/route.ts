@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { getMockSession } from "@/server/auth/mock-session";
+import { getAuthenticatedSession } from "@/server/auth/session";
+import { invalidRequestResponse, unauthorizedResponse } from "@/server/http/responses";
 import {
-  getMockCustomerDetail,
-  updateMockCustomer,
-} from "@/server/customers/mock-customer-data";
+  getCustomerDetailFromDatabase,
+  updateCustomerTagsFromDatabase,
+} from "@/server/services/customers";
 
 type RouteContext = {
   params: Promise<{
@@ -29,23 +30,14 @@ function normalizeTags(value: unknown) {
 }
 
 export async function GET(_: Request, context: RouteContext) {
-  const session = await getMockSession();
+  const session = await getAuthenticatedSession();
 
   if (!session) {
-    return NextResponse.json(
-      {
-        code: "UNAUTHORIZED",
-        message: "Your session has expired. Please sign in again.",
-      },
-      { status: 401 },
-    );
+    return unauthorizedResponse();
   }
 
   const { customerId } = await context.params;
-
-  await new Promise((resolve) => setTimeout(resolve, 180));
-
-  const customer = await getMockCustomerDetail(session.id, customerId);
+  const customer = await getCustomerDetailFromDatabase(session, customerId);
 
   if (!customer) {
     return NextResponse.json(
@@ -61,36 +53,21 @@ export async function GET(_: Request, context: RouteContext) {
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
-  const session = await getMockSession();
+  const session = await getAuthenticatedSession();
 
   if (!session) {
-    return NextResponse.json(
-      {
-        code: "UNAUTHORIZED",
-        message: "Your session has expired. Please sign in again.",
-      },
-      { status: 401 },
-    );
+    return unauthorizedResponse();
   }
 
   const body = (await request.json().catch(() => null)) as UpdateCustomerBody | null;
   const tags = normalizeTags(body?.tags);
 
   if (!tags || tags.length === 0) {
-    return NextResponse.json(
-      {
-        code: "INVALID_REQUEST",
-        message: "Choose at least one tag before saving.",
-      },
-      { status: 400 },
-    );
+    return invalidRequestResponse("Choose at least one tag before saving.");
   }
 
   const { customerId } = await context.params;
-
-  await new Promise((resolve) => setTimeout(resolve, 220));
-
-  const customer = await updateMockCustomer(session.id, customerId, { tags });
+  const customer = await updateCustomerTagsFromDatabase(session, customerId, tags);
 
   if (!customer) {
     return NextResponse.json(

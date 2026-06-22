@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useId, useMemo, useState } from "react";
 import { useFormatter, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
@@ -379,9 +380,22 @@ export function CustomersWorkspace() {
                               className="flex w-full items-start gap-3 text-left"
                               onClick={() => void openCustomer(customer.id)}
                             >
-                              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-sm font-semibold text-white">
-                                {customer.avatarFallback}
-                              </div>
+                              {customer.avatarImageUrl ? (
+                                <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-2xl bg-slate-100">
+                                  <Image
+                                    alt={customer.name}
+                                    className="object-cover"
+                                    fill
+                                    sizes="48px"
+                                    src={customer.avatarImageUrl}
+                                    unoptimized
+                                  />
+                                </div>
+                              ) : (
+                                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-sm font-semibold text-white">
+                                  {customer.avatarFallback}
+                                </div>
+                              )}
                               <div className="min-w-0 space-y-1">
                                 <p className="text-sm font-semibold text-slate-950 dark:text-slate-100">
                                   {customer.name}
@@ -446,9 +460,22 @@ export function CustomersWorkspace() {
                       onClick={() => void openCustomer(customer.id)}
                     >
                       <div className="flex items-start gap-3">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-sm font-semibold text-white">
-                          {customer.avatarFallback}
-                        </div>
+                        {customer.avatarImageUrl ? (
+                          <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-2xl bg-slate-100">
+                            <Image
+                              alt={customer.name}
+                              className="object-cover"
+                              fill
+                              sizes="48px"
+                              src={customer.avatarImageUrl}
+                              unoptimized
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-sm font-semibold text-white">
+                            {customer.avatarFallback}
+                          </div>
+                        )}
                         <div className="min-w-0 flex-1 space-y-2">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-sm font-semibold text-slate-950 dark:text-slate-100">

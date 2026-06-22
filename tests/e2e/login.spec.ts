@@ -84,14 +84,14 @@ test.describe("login", () => {
     expect(loginRequests).toBe(1);
   });
 
-  test("forgot password shows mock feedback", async ({ page }) => {
+  test("forgot password shows workspace help", async ({ page }) => {
     await page.goto("/login");
 
     await page.getByRole("button", { name: "Forgot password?" }).click();
 
     await expect(
       page.getByText(
-        "Password reset is unavailable in the mock environment. Use the demo credentials provided in the spec.",
+        "Password reset is not available from this screen. Contact your workspace administrator for help.",
       ),
     ).toBeVisible();
   });

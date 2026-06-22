@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { authenticateMockUser } from "@/server/auth/mock-auth";
-import { createMockSession } from "@/server/auth/mock-session";
+import { getAuthenticatedSession } from "@/server/auth/session";
+import { createSupabaseServerClient } from "@/server/supabase/server";
 
 type LoginRequestBody = {
   email?: unknown;
@@ -31,14 +31,13 @@ export async function POST(request: Request) {
     );
   }
 
-  await new Promise((resolve) => setTimeout(resolve, 450));
-
-  const user = authenticateMockUser({
-    email: body.email,
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.auth.signInWithPassword({
+    email: body.email.trim(),
     password: body.password,
   });
 
-  if (!user) {
+  if (error) {
     return NextResponse.json(
       {
         code: "INVALID_CREDENTIALS",
@@ -48,7 +47,19 @@ export async function POST(request: Request) {
     );
   }
 
-  await createMockSession(body.rememberMe, user.id);
+  const session = await getAuthenticatedSession();
 
-  return NextResponse.json({ user });
+  if (!session) {
+    await supabase.auth.signOut();
+
+    return NextResponse.json(
+      {
+        code: "FORBIDDEN",
+        message: "Your account is not linked to an active workspace membership.",
+      },
+      { status: 403 },
+    );
+  }
+
+  return NextResponse.json({ user: session.user });
 }

@@ -1,24 +1,15 @@
 import { NextResponse } from "next/server";
-import { getMockSession } from "@/server/auth/mock-session";
-import { disconnectMockIntegration } from "@/server/integrations/mock-integrations-data";
 import type { IntegrationProvider } from "@/features/integrations/types/integrations";
+import { getAuthenticatedSession } from "@/server/auth/session";
+import { unauthorizedResponse } from "@/server/http/responses";
+import { disconnectIntegrationInDatabase } from "@/server/services/integrations";
 
 type RouteContext = {
   params: Promise<{ provider: string }>;
 };
 
-function unauthorizedResponse() {
-  return NextResponse.json(
-    {
-      code: "UNAUTHORIZED",
-      message: "Your session has expired. Please sign in again.",
-    },
-    { status: 401 },
-  );
-}
-
 export async function DELETE(_: Request, context: RouteContext) {
-  const session = await getMockSession();
+  const session = await getAuthenticatedSession();
 
   if (!session) {
     return unauthorizedResponse();
@@ -26,12 +17,7 @@ export async function DELETE(_: Request, context: RouteContext) {
 
   const { provider } = await context.params;
 
-  await new Promise((resolve) => setTimeout(resolve, 260));
-
-  const result = await disconnectMockIntegration(
-    session.id,
-    provider as IntegrationProvider,
-  );
+  const result = await disconnectIntegrationInDatabase(session, provider as IntegrationProvider);
 
   if (!result) {
     return NextResponse.json(

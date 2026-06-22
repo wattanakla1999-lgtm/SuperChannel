@@ -1,28 +1,20 @@
 import { NextResponse } from "next/server";
-import { getMockSession } from "@/server/auth/mock-session";
-import { createMockPublishingPost, listMockPublishingPosts } from "@/server/publishing/mock-publishing-data";
 import type { PublishingCreateInput, PublishingChannel } from "@/features/publishing/types/publishing";
-
-function unauthorizedResponse() {
-  return NextResponse.json(
-    {
-      code: "UNAUTHORIZED",
-      message: "Your session has expired. Please sign in again.",
-    },
-    { status: 401 },
-  );
-}
+import { getAuthenticatedSession } from "@/server/auth/session";
+import { unauthorizedResponse } from "@/server/http/responses";
+import {
+  createPublishingPostInDatabase,
+  listPublishingPostsFromDatabase,
+} from "@/server/services/publishing";
 
 export async function GET() {
-  const session = await getMockSession();
+  const session = await getAuthenticatedSession();
 
   if (!session) {
     return unauthorizedResponse();
   }
 
-  await new Promise((resolve) => setTimeout(resolve, 220));
-
-  const posts = await listMockPublishingPosts(session.id);
+  const posts = await listPublishingPostsFromDatabase(session);
   return NextResponse.json({ posts });
 }
 
@@ -46,7 +38,7 @@ function isChannelList(channels: unknown): channels is PublishingChannel[] {
 }
 
 export async function POST(request: Request) {
-  const session = await getMockSession();
+  const session = await getAuthenticatedSession();
 
   if (!session) {
     return unauthorizedResponse();
@@ -102,8 +94,6 @@ export async function POST(request: Request) {
     );
   }
 
-  await new Promise((resolve) => setTimeout(resolve, 400));
-
-  const result = await createMockPublishingPost(session.id, input);
+  const result = await createPublishingPostInDatabase(session, input);
   return NextResponse.json(result, { status: 201 });
 }

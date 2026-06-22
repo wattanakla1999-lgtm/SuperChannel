@@ -9,7 +9,7 @@ export type PublishingStatus = "all" | "draft" | "scheduled" | "published" | "fa
 
 export type PublishingStoredStatus = Exclude<PublishingStatus, "all">;
 
-export type MockMediaAsset = {
+export type MediaAsset = {
   accent: string;
   id: string;
   label: string;
@@ -20,7 +20,7 @@ export type PublishingPost = {
   channels: PublishingChannel[];
   createdAt: string;
   id: string;
-  media: MockMediaAsset | null;
+  media: MediaAsset | null;
   scheduledFor: string | null;
   status: PublishingStoredStatus;
 };

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getMockSession } from "@/server/auth/mock-session";
-import { appendMockConversationMessage } from "@/server/inbox/mock-inbox-data";
+import { getAuthenticatedSession } from "@/server/auth/session";
+import { invalidRequestResponse, unauthorizedResponse } from "@/server/http/responses";
+import { appendConversationMessageFromDatabase } from "@/server/services/customers";
 
 type RouteContext = {
   params: Promise<{
@@ -13,16 +14,10 @@ type MessageRequestBody = {
 };
 
 export async function POST(request: Request, context: RouteContext) {
-  const session = await getMockSession();
+  const session = await getAuthenticatedSession();
 
   if (!session) {
-    return NextResponse.json(
-      {
-        code: "UNAUTHORIZED",
-        message: "Your session has expired. Please sign in again.",
-      },
-      { status: 401 },
-    );
+    return unauthorizedResponse();
   }
 
   const body = (await request.json().catch(() => null)) as
@@ -30,24 +25,40 @@ export async function POST(request: Request, context: RouteContext) {
     | null;
 
   if (!body || typeof body.body !== "string" || !body.body.trim()) {
-    return NextResponse.json(
-      {
-        code: "INVALID_REQUEST",
-        message: "Please enter a message before sending.",
-      },
-      { status: 400 },
-    );
+    return invalidRequestResponse("Please enter a message before sending.");
   }
 
   const { conversationId } = await context.params;
+  let result;
 
-  await new Promise((resolve) => setTimeout(resolve, 400));
+  try {
+    result = await appendConversationMessageFromDatabase(session, conversationId, body.body.trim());
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.name === "CONFLICT") {
+        return NextResponse.json(
+          { code: "CONFLICT", message: error.message },
+          { status: 409 },
+        );
+      }
 
-  const result = await appendMockConversationMessage(
-    session.id,
-    conversationId,
-    body.body.trim(),
-  );
+      if (error.name === "FORBIDDEN") {
+        return NextResponse.json(
+          { code: "FORBIDDEN", message: error.message },
+          { status: 403 },
+        );
+      }
+
+      if (error.name === "SERVICE_UNAVAILABLE") {
+        return NextResponse.json(
+          { code: "SERVICE_UNAVAILABLE", message: error.message },
+          { status: 503 },
+        );
+      }
+    }
+
+    throw error;
+  }
 
   if (!result) {
     return NextResponse.json(

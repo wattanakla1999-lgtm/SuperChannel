@@ -1,23 +1,14 @@
 import { NextResponse } from "next/server";
-import { getMockSession } from "@/server/auth/mock-session";
-import { publishMockPublishingPost } from "@/server/publishing/mock-publishing-data";
+import { getAuthenticatedSession } from "@/server/auth/session";
+import { unauthorizedResponse } from "@/server/http/responses";
+import { publishPublishingPostInDatabase } from "@/server/services/publishing";
 
 type RouteContext = {
   params: Promise<{ postId: string }>;
 };
 
-function unauthorizedResponse() {
-  return NextResponse.json(
-    {
-      code: "UNAUTHORIZED",
-      message: "Your session has expired. Please sign in again.",
-    },
-    { status: 401 },
-  );
-}
-
 export async function POST(_: Request, context: RouteContext) {
-  const session = await getMockSession();
+  const session = await getAuthenticatedSession();
 
   if (!session) {
     return unauthorizedResponse();
@@ -25,9 +16,7 @@ export async function POST(_: Request, context: RouteContext) {
 
   const { postId } = await context.params;
 
-  await new Promise((resolve) => setTimeout(resolve, 300));
-
-  const result = await publishMockPublishingPost(session.id, postId);
+  const result = await publishPublishingPostInDatabase(session, postId);
 
   if (!result) {
     return NextResponse.json(

@@ -65,7 +65,7 @@ const sectionDefinitions: Array<{ description: string; id: SettingsSection; labe
     label: "Notifications",
   },
   {
-    description: "Session visibility and mock security controls.",
+    description: "Session visibility and account security details.",
     id: "security",
     label: "Security",
   },
@@ -611,7 +611,7 @@ export function SettingsWorkspace() {
                       />
                     </label>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Preview only. Logo files are not uploaded in the mock environment.
+                      Preview only. Logo uploads are not enabled in this workspace.
                     </p>
                   </div>
 
@@ -961,7 +961,7 @@ export function SettingsWorkspace() {
             {activeSection === "notifications" && notifications ? (
               <SectionFrame
                 canManageSettings={canManageSettings}
-                description="Choose which operational alerts should surface in the workspace and mock email delivery."
+                description="Choose which operational alerts should surface in the workspace and email delivery."
                 onReset={() => setShowResetConfirm(true)}
                 onSave={() => void handleSaveSection()}
                 showActions
@@ -1057,7 +1057,7 @@ export function SettingsWorkspace() {
             {activeSection === "security" && security ? (
               <SectionFrame
                 canManageSettings={canManageSettings}
-                description="Review mock session details without exposing credentials, tokens, or real security controls."
+                description="Review session details without exposing credentials, tokens, or protected security controls."
                 title={t("sections.security")}
               >
                 <div className="grid gap-4 md:grid-cols-2">
@@ -1114,7 +1114,7 @@ export function SettingsWorkspace() {
       >
         <div className="space-y-5">
           <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
-            This resets the current section back to the last saved mock state.
+            This resets the current section back to the last saved state.
           </p>
           <div className="flex justify-end gap-3">
             <Button className="w-auto" onClick={() => setShowResetConfirm(false)} variant="secondary">
@@ -1200,7 +1200,7 @@ export function SettingsWorkspace() {
       >
         <div className="space-y-5">
           <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
-            Delete {replyToDelete?.title} from the mock workspace and Inbox composer?
+            Delete {replyToDelete?.title} from the workspace and Inbox composer?
           </p>
           <div className="flex justify-end gap-3">
             <Button className="w-auto" onClick={() => setReplyToDelete(null)} variant="secondary">

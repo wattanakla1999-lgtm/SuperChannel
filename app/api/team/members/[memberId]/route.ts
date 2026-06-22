@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { getMockAssignmentMetrics } from "@/server/customers/mock-customer-data";
-import { getMockSession } from "@/server/auth/mock-session";
-import {
-  removeMockTeamMember,
-  updateMockTeamMember,
-} from "@/server/team/mock-team-data";
 import type { TeamRole } from "@/features/team/types/team";
+import { getAuthenticatedSession } from "@/server/auth/session";
+import { unauthorizedResponse } from "@/server/http/responses";
+import {
+  removeTeamMemberInDatabase,
+  updateTeamMemberInDatabase,
+} from "@/server/services/team";
 
 type RouteContext = {
   params: Promise<{
@@ -43,13 +43,10 @@ function toErrorResponse(error: unknown) {
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
-  const session = await getMockSession();
+  const session = await getAuthenticatedSession();
 
   if (!session) {
-    return NextResponse.json(
-      { code: "UNAUTHORIZED", message: "Your session has expired. Please sign in again." },
-      { status: 401 },
-    );
+    return unauthorizedResponse();
   }
 
   const body = (await request.json().catch(() => null)) as UpdateBody | null;
@@ -74,13 +71,9 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const { memberId } = await context.params;
 
-  await new Promise((resolve) => setTimeout(resolve, 240));
-
   try {
-    const member = updateMockTeamMember(
-      session.id,
-      session.accountId,
-      session.user.role as TeamRole,
+    const member = await updateTeamMemberInDatabase(
+      session,
       memberId,
       {
         accountStatus: body.accountStatus as "active" | "inactive" | undefined,
@@ -89,43 +82,38 @@ export async function PATCH(request: Request, context: RouteContext) {
         workloadLimit: body.workloadLimit as number | undefined,
       },
     );
-    const metrics = getMockAssignmentMetrics(session.id).get(member.name) ?? {
-      activeConversationCount: 0,
-      assignedConversationCount: 0,
-    };
 
-    return NextResponse.json({
-      ...member,
-      activeConversationCount: metrics.activeConversationCount,
-      assignedConversationCount: metrics.assignedConversationCount,
-      isCurrentUser: member.id === session.accountId,
-    });
+    if (!member) {
+      return NextResponse.json(
+        { code: "NOT_FOUND", message: "Team member not found." },
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json(member);
   } catch (error) {
     return toErrorResponse(error);
   }
 }
 
 export async function DELETE(_: Request, context: RouteContext) {
-  const session = await getMockSession();
+  const session = await getAuthenticatedSession();
 
   if (!session) {
-    return NextResponse.json(
-      { code: "UNAUTHORIZED", message: "Your session has expired. Please sign in again." },
-      { status: 401 },
-    );
+    return unauthorizedResponse();
   }
 
   const { memberId } = await context.params;
 
-  await new Promise((resolve) => setTimeout(resolve, 220));
-
   try {
-    removeMockTeamMember(
-      session.id,
-      session.accountId,
-      session.user.role as TeamRole,
-      memberId,
-    );
+    const removed = await removeTeamMemberInDatabase(session, memberId);
+
+    if (!removed) {
+      return NextResponse.json(
+        { code: "NOT_FOUND", message: "Team member not found." },
+        { status: 404 },
+      );
+    }
 
     return NextResponse.json({ ok: true });
   } catch (error) {

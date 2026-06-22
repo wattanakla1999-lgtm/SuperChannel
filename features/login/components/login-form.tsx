@@ -171,7 +171,7 @@ export function LoginForm() {
           className="text-left text-sm font-medium text-slate-600 transition hover:text-slate-950 dark:text-slate-400 dark:hover:text-slate-100 sm:text-right"
           onClick={() =>
             setForgotPasswordMessage(
-              t("forgotMock"),
+              t("forgotHelp"),
             )
           }
         >

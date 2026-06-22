@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import type { DashboardQuery } from "@/features/dashboard/types/dashboard";
-import { getMockSession } from "@/server/auth/mock-session";
-import { buildMockDashboardSnapshot } from "@/server/dashboard/mock-dashboard-data";
+import { getAuthenticatedSession } from "@/server/auth/session";
+import { unauthorizedResponse } from "@/server/http/responses";
+import { buildDashboardSnapshotFromDatabase } from "@/server/services/dashboard";
 
 function getDashboardQuery(request: Request): DashboardQuery {
   const { searchParams } = new URL(request.url);
@@ -17,18 +18,14 @@ function getDashboardQuery(request: Request): DashboardQuery {
 }
 
 export async function GET(request: Request) {
-  const session = await getMockSession();
+  const session = await getAuthenticatedSession();
 
   if (!session) {
-    return NextResponse.json(
-      { code: "UNAUTHORIZED", message: "Your session has expired. Please sign in again." },
-      { status: 401 },
-    );
+    return unauthorizedResponse();
   }
 
   try {
-    await new Promise((resolve) => setTimeout(resolve, 220));
-    const snapshot = buildMockDashboardSnapshot(session, getDashboardQuery(request));
+    const snapshot = await buildDashboardSnapshotFromDatabase(session, getDashboardQuery(request));
 
     return NextResponse.json({ overview: snapshot.overview });
   } catch (error) {

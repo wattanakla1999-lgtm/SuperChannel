@@ -149,7 +149,7 @@ export function IntegrationsWorkspace() {
 
   const handleConnectSubmit = async () => {
     if (!dialogProvider || !selectedAccountId) {
-      setDialogError("Choose a mock business account");
+      setDialogError("Choose a business account");
       return;
     }
 
@@ -392,14 +392,14 @@ export function IntegrationsWorkspace() {
               2. Simulated authorization
             </h3>
             <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
-              This mock flow simulates provider authorization without requesting
-              any real credentials or secrets.
+              This setup flow prepares the provider connection without exposing
+              credentials or secrets in the browser.
             </p>
           </section>
 
           <section className="space-y-3">
             <h3 className="text-sm font-semibold text-slate-950 dark:text-slate-100">
-              3. Select a mock business account
+              3. Select a business account
             </h3>
             <Dropdown
               ariaLabel={t("connectTitle", { provider: dialogProvider?.providerName ?? "" })}
@@ -412,11 +412,11 @@ export function IntegrationsWorkspace() {
 
           <section className="space-y-3">
             <h3 className="text-sm font-semibold text-slate-950 dark:text-slate-100">
-              4. Run a mock connection test
+              4. Run a connection test
             </h3>
             <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
               The selected account will be marked connected and immediately
-              verified with a safe mock health check.
+              verified with a safe health check.
             </p>
           </section>
 

@@ -9,6 +9,7 @@ export type CustomerChannelIdentity = {
 
 export type CustomerSummary = {
   assignedAgent: string;
+  avatarImageUrl?: string | null;
   avatarFallback: string;
   connectedChannels: CustomerChannelIdentity[];
   email: string;

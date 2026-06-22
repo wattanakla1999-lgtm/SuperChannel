@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import type { SavedReplyInput } from "@/features/settings/types/settings";
-import { getMockSession } from "@/server/auth/mock-session";
+import { getAuthenticatedSession } from "@/server/auth/session";
+import { unauthorizedResponse } from "@/server/http/responses";
 import {
-  createMockSavedReply,
-  listMockSavedReplies,
-} from "@/server/settings/mock-settings-data";
+  createSavedReplyInDatabase,
+  listSavedRepliesFromDatabase,
+} from "@/server/services/settings";
 
 function toErrorResponse(error: unknown) {
   if (!(error instanceof Error)) {
@@ -26,38 +27,24 @@ function toErrorResponse(error: unknown) {
 }
 
 export async function GET(request: Request) {
-  const session = await getMockSession();
+  const session = await getAuthenticatedSession();
 
   if (!session) {
-    return NextResponse.json(
-      {
-        code: "UNAUTHORIZED",
-        message: "Your session has expired. Please sign in again.",
-      },
-      { status: 401 },
-    );
+    return unauthorizedResponse();
   }
 
   const { searchParams } = new URL(request.url);
 
-  await new Promise((resolve) => setTimeout(resolve, 160));
-
   return NextResponse.json({
-    replies: listMockSavedReplies(session.id, searchParams.get("search") ?? undefined),
+    replies: await listSavedRepliesFromDatabase(session, searchParams.get("search") ?? undefined),
   });
 }
 
 export async function POST(request: Request) {
-  const session = await getMockSession();
+  const session = await getAuthenticatedSession();
 
   if (!session) {
-    return NextResponse.json(
-      {
-        code: "UNAUTHORIZED",
-        message: "Your session has expired. Please sign in again.",
-      },
-      { status: 401 },
-    );
+    return unauthorizedResponse();
   }
 
   const body = (await request.json().catch(() => null)) as SavedReplyInput | null;
@@ -69,10 +56,8 @@ export async function POST(request: Request) {
     );
   }
 
-  await new Promise((resolve) => setTimeout(resolve, 200));
-
   try {
-    return NextResponse.json(createMockSavedReply(session.id, session.user, body), { status: 201 });
+    return NextResponse.json(await createSavedReplyInDatabase(session, body), { status: 201 });
   } catch (error) {
     return toErrorResponse(error);
   }

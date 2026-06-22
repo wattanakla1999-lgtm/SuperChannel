@@ -60,7 +60,7 @@ test.describe("integrations", () => {
     await expect(page.getByTestId("integration-card-facebook")).toHaveCount(0);
   });
 
-  test("mock connect flow changes a provider to Connected", async ({ page }) => {
+  test("connect flow changes a provider to Connected", async ({ page }) => {
     await login(page);
     await page.goto("/integrations");
 

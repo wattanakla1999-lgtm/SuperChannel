@@ -26,7 +26,7 @@ test.describe("publishing", () => {
     );
   });
 
-  test("mock post list and status filters render correctly", async ({ page }) => {
+  test("post list and status filters render correctly", async ({ page }) => {
     await login(page);
     await page.goto("/publishing");
 

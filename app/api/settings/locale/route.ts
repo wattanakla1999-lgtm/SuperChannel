@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAppLocale, localeCookieName } from "@/i18n/config";
-import { getMockSession } from "@/server/auth/mock-session";
-import { updateMockLocalePreference } from "@/server/settings/mock-settings-data";
+import { getAuthenticatedSession } from "@/server/auth/session";
+import { updateLocalePreferenceInDatabase } from "@/server/services/settings";
 
 export async function PATCH(request: Request) {
   const body = (await request.json().catch(() => null)) as { locale?: unknown } | null;
@@ -13,10 +13,10 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const session = await getMockSession();
+  const session = await getAuthenticatedSession();
 
   if (session) {
-    updateMockLocalePreference(session.id, body.locale);
+    await updateLocalePreferenceInDatabase(session, body.locale);
   }
 
   const response = NextResponse.json({ locale: body.locale });

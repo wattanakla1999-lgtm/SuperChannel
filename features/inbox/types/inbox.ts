@@ -9,9 +9,10 @@ export type ConversationStatus =
 
 export type ThreadStatus = Exclude<ConversationStatus, "all" | "unread">;
 
-export type MessageType = "text" | "image";
+export type MessageType = "text" | "image" | "sticker" | "audio";
 
 export type Customer = {
+  avatarImageUrl?: string | null;
   id: string;
   avatarFallback: string;
   email: string;
@@ -23,6 +24,7 @@ export type Customer = {
 
 export type ConversationSummary = {
   assignedAgent: string;
+  customerAvatarImageUrl?: string | null;
   channel: InboxChannel;
   customerAvatarFallback: string;
   customerId: string;
@@ -36,6 +38,9 @@ export type ConversationSummary = {
 };
 
 export type ConversationMessage = {
+  audioDurationMs?: number | null;
+  audioUrl?: string | null;
+  imageUrl?: string | null;
   body: string;
   createdAt: string;
   id: string;
@@ -76,4 +81,3 @@ export const DIVIDER_WIDTH = 12;
 
 export type PanelSide = "left" | "right";
 export type PanelWidths = typeof DEFAULT_PANEL_WIDTHS;
-

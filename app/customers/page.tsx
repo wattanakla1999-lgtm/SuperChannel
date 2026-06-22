@@ -3,7 +3,7 @@ import { CustomersWorkspace } from "@/features/customers/components/customers-wo
 
 export const metadata: Metadata = {
   title: "Customers | SuperChannel",
-  description: "Mock customer directory for SuperChannel.",
+  description: "Customer directory for SuperChannel.",
 };
 
 export default function CustomersPage() {

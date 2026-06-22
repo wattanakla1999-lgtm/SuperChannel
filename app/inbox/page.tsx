@@ -3,7 +3,7 @@ import { InboxWorkspace } from "@/features/inbox/components/inbox-workspace";
 
 export const metadata: Metadata = {
   title: "Inbox | SuperChannel",
-  description: "Mock authenticated inbox for SuperChannel.",
+  description: "Authenticated inbox for SuperChannel.",
 };
 
 export default async function InboxPage({

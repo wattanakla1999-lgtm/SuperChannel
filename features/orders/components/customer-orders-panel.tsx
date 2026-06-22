@@ -652,7 +652,7 @@ export function CustomerOrdersPanel({
                 {t("invoicePreview")}
               </p>
               <p className="break-words text-xs text-slate-500 dark:text-slate-400">
-                {t("invoiceMock")}
+                {t("invoiceActionsNote")}
               </p>
             </div>
             {invoice ? (
