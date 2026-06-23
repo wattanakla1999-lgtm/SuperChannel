@@ -135,6 +135,7 @@ export function CustomerOrdersPanel({
   const [error, setError] = useState<string | null>(null);
   const [isForbiddenState, setIsForbiddenState] = useState(false);
   const [retryToken, setRetryToken] = useState(0);
+  const [unauthorizedRetries, setUnauthorizedRetries] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -154,18 +155,31 @@ export function CustomerOrdersPanel({
         setOrders(nextOrdersResponse.orders);
         setTimezone(nextSummary.timezone || nextOrdersResponse.timezone);
         setSelectedOrderId(nextOrdersResponse.orders[0]?.id ?? null);
+        setUnauthorizedRetries(0);
       } catch (error) {
         if (!isMounted) {
           return;
         }
 
+        if (isUnauthorized(error)) {
+          setUnauthorizedRetries((current) => {
+            const nextCount = current + 1;
+            if (nextCount < 2) {
+              return nextCount;
+            }
+
+            setIsForbiddenState(false);
+            setError(tCommon("sessionExpired"));
+            return nextCount;
+          });
+          return;
+        }
+
         setIsForbiddenState(isForbidden(error));
         setError(
-          isUnauthorized(error)
-            ? tCommon("sessionExpired")
-            : error instanceof ApiError
-              ? error.message
-              : t("unavailable"),
+          error instanceof ApiError
+            ? error.message
+            : t("unavailable"),
         );
       } finally {
         if (isMounted) {

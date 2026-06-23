@@ -11,6 +11,7 @@ import {
   side: PanelSide;
   value: number;
   isActive: boolean;
+  onDoubleClick?: () => void;
   onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void;
   onPointerDown: (event: PointerEvent<HTMLDivElement>) => void;
   onPointerMove: (event: PointerEvent<HTMLDivElement>) => void;
@@ -20,6 +21,7 @@ export default function PanelResizeDivider({
   side,
   value,
   isActive,
+  onDoubleClick,
   onKeyDown,
   onPointerDown,
   onPointerMove,
@@ -43,6 +45,7 @@ export default function PanelResizeDivider({
         isActive && "bg-cyan-100/70 dark:bg-cyan-950/40",
       )}
       onKeyDown={onKeyDown}
+      onDoubleClick={onDoubleClick}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerEnd}

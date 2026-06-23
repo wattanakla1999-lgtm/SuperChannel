@@ -1,6 +1,15 @@
 "use client";
 
 import Image from "next/image";
+import {
+  ArrowLeft,
+  Ellipsis,
+  MessagesSquare,
+  Paperclip,
+  Search,
+  SendHorizonal,
+  Sparkles,
+} from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
@@ -11,6 +20,7 @@ import { ApiError } from "@/lib/http/api-error";
 import { useFormatter, useTranslations } from "next-intl";
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   useSyncExternalStore,
@@ -51,103 +61,11 @@ const LIST_POLL_INTERVAL_MS = 4_000;
 const DETAIL_POLL_INTERVAL_MS = 3_000;
 
 const channelClasses: Record<InboxChannel, string> = {
-  Facebook: "bg-blue-100 text-blue-700",
-  Instagram: "bg-pink-100 text-pink-700",
-  LINE: "bg-emerald-100 text-emerald-700",
-  Telegram: "bg-sky-100 text-sky-700",
+  Facebook: "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-200",
+  Instagram: "bg-pink-50 text-pink-700 dark:bg-pink-950/50 dark:text-pink-200",
+  LINE: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200",
+  Telegram: "bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-200",
 };
-
-function ImageAttachIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-5 w-5"
-      fill="none"
-      viewBox="0 0 24 24"
-    >
-      <path
-        d="M4.75 6.75A2.25 2.25 0 0 1 7 4.5h10A2.25 2.25 0 0 1 19.25 6.75v10A2.25 2.25 0 0 1 17 19H7A2.25 2.25 0 0 1 4.75 16.75z"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      />
-      <path
-        d="m6.75 15.75 3.8-3.8a1 1 0 0 1 1.42 0l1.78 1.78a1 1 0 0 0 1.42 0l2.08-2.08"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      />
-      <circle cx="9" cy="9" r="1.25" fill="currentColor" />
-    </svg>
-  );
-}
-
-function SavedReplyIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-4.5 w-4.5"
-      fill="none"
-      viewBox="0 0 24 24"
-    >
-      <path
-        d="M7.75 8.75h8.5M7.75 12h6.5M6.75 4.75h10.5a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2H12l-3.75 3v-3H6.75a2 2 0 0 1-2-2v-7.5a2 2 0 0 1 2-2Z"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.7"
-      />
-    </svg>
-  );
-}
-
-function SendIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-5 w-5"
-      fill="none"
-      viewBox="0 0 24 24"
-    >
-      <path
-        d="M21 3 10 14"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      />
-      <path
-        d="m21 3-7 18-4-7-7-4 18-7Z"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      />
-    </svg>
-  );
-}
-
-function CloseIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-4 w-4"
-      fill="none"
-      viewBox="0 0 24 24"
-    >
-      <path
-        d="m7 7 10 10M17 7 7 17"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="2"
-      />
-    </svg>
-  );
-}
-
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(Math.max(value, minimum), maximum);
@@ -216,8 +134,10 @@ export function InboxWorkspace({
   const [activeConversationId, setActiveConversationId] = useState<string | null>(
     null,
   );
-  const [activeDetail, setActiveDetail] = useState<ConversationDetail | null>(null);
+  const [detailCache, setDetailCache] = useState<Record<string, ConversationDetail>>({});
+  const detailCacheRef = useRef<Record<string, ConversationDetail>>({});
   const [activeFilter, setActiveFilter] = useState<ConversationStatus>("all");
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [listError, setListError] = useState<string | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
@@ -251,6 +171,11 @@ export function InboxWorkspace({
   } | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const messageThreadRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const shouldAutoScrollRef = useRef(true);
+  const shouldInstantScrollRef = useRef(false);
+  const listUnauthorizedCountRef = useRef(0);
+  const detailUnauthorizedCountRef = useRef(0);
   const selectedConversationIdRef = useRef<string | null>(null);
   const isSendingRef = useRef(false);
   const isHydrated = useSyncExternalStore(
@@ -399,6 +324,15 @@ export function InboxWorkspace({
     );
   };
 
+  const resetPanelWidths = () => {
+    const workspaceWidth = panelGridRef.current?.clientWidth;
+    setPanelWidths(
+      workspaceWidth
+        ? fitPanelWidths(DEFAULT_PANEL_WIDTHS, workspaceWidth)
+        : DEFAULT_PANEL_WIDTHS,
+    );
+  };
+
   useEffect(() => {
     let isMounted = true;
 
@@ -471,8 +405,14 @@ export function InboxWorkspace({
         (conversation) => conversation.id === activeConversationId,
       )?.id ?? visibleConversations[0].id;
 
+  const activeDetail = selectedConversationId ? detailCache[selectedConversationId] || null : null;
+
   useEffect(() => {
     selectedConversationIdRef.current = selectedConversationId;
+  }, [selectedConversationId]);
+
+  useEffect(() => {
+    shouldAutoScrollRef.current = true;
   }, [selectedConversationId]);
 
   useEffect(() => {
@@ -488,7 +428,9 @@ export function InboxWorkspace({
     let isMounted = true;
 
     async function loadDetail() {
-      setIsDetailLoading(true);
+      if (!detailCacheRef.current[conversationId]) {
+        setIsDetailLoading(true);
+      }
       setDetailError(null);
       setComposerError(null);
 
@@ -499,7 +441,11 @@ export function InboxWorkspace({
           return;
         }
 
-        setActiveDetail(detail);
+        setDetailCache((prev) => {
+          const next = { ...prev, [conversationId]: detail };
+          detailCacheRef.current = next;
+          return next;
+        });
         setConversations((current) =>
           current.map((conversation) =>
             conversation.id === detail.conversation.id
@@ -547,6 +493,7 @@ export function InboxWorkspace({
         }
 
         setConversations(nextConversations);
+        listUnauthorizedCountRef.current = 0;
         setActiveConversationId((current) => {
           if (
             current &&
@@ -570,6 +517,13 @@ export function InboxWorkspace({
       } catch (error) {
         if (!isMounted) {
           return;
+        }
+
+        if (isUnauthorized(error)) {
+          listUnauthorizedCountRef.current += 1;
+          if (listUnauthorizedCountRef.current < 2) {
+            return;
+          }
         }
 
         setListError(
@@ -623,7 +577,11 @@ export function InboxWorkspace({
           return;
         }
 
-        setActiveDetail(detail);
+        setDetailCache((prev) => {
+          const next = { ...prev, [currentConversationId]: detail };
+          detailCacheRef.current = next;
+          return next;
+        });
         setConversations((current) =>
           current.map((conversation) =>
             conversation.id === detail.conversation.id
@@ -631,10 +589,18 @@ export function InboxWorkspace({
               : conversation,
           ),
         );
+        detailUnauthorizedCountRef.current = 0;
         setDetailError(null);
       } catch (error) {
         if (!isMounted) {
           return;
+        }
+
+        if (isUnauthorized(error)) {
+          detailUnauthorizedCountRef.current += 1;
+          if (detailUnauthorizedCountRef.current < 2) {
+            return;
+          }
         }
 
         setDetailError(
@@ -668,6 +634,8 @@ export function InboxWorkspace({
     setActiveConversationId(conversationId);
     setIsMobileDetailOpen(true);
     setIsCustomerDrawerOpen(false);
+    shouldAutoScrollRef.current = true;
+    shouldInstantScrollRef.current = !!detailCacheRef.current[conversationId];
   };
 
   const handleSendMessage = async () => {
@@ -696,15 +664,20 @@ export function InboxWorkspace({
             ),
         );
 
-        setActiveDetail((current) =>
-          current && current.conversation.id === selectedConversationId
-            ? {
-                ...current,
-                conversation: result.conversation,
-                messages: [...current.messages, result.message],
-              }
-            : current,
-        );
+        setDetailCache((prev) => {
+          const currentDetail = selectedConversationId ? prev[selectedConversationId] : null;
+          if (!currentDetail || currentDetail.conversation.id !== selectedConversationId) {
+            return prev;
+          }
+          const nextDetail = {
+            ...currentDetail,
+            conversation: result.conversation,
+            messages: [...currentDetail.messages, result.message],
+          };
+          const next = { ...prev, [selectedConversationId]: nextDetail };
+          detailCacheRef.current = next;
+          return next;
+        });
       };
 
       if (pendingImage) {
@@ -772,6 +745,13 @@ export function InboxWorkspace({
     });
   };
 
+  const handleMessageKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      void handleSendMessage();
+    }
+  };
+
   const handleOpenSavedReplies = async () => {
     setIsSavedRepliesOpen(true);
     setSavedRepliesError(null);
@@ -826,16 +806,42 @@ export function InboxWorkspace({
   useEffect(() => {
     const messageThread = messageThreadRef.current;
 
-    if (!messageThread || !activeConversation) {
+    if (!messageThread) {
       return;
     }
 
-    const frameId = window.requestAnimationFrame(() => {
-      messageThread.scrollTop = messageThread.scrollHeight;
-    });
+    const handleScroll = () => {
+      const distanceFromBottom =
+        messageThread.scrollHeight - messageThread.scrollTop - messageThread.clientHeight;
+      shouldAutoScrollRef.current = distanceFromBottom < 96;
+    };
 
-    return () => window.cancelAnimationFrame(frameId);
-  }, [activeConversation, latestMessageId, activeMessages.length]);
+    messageThread.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      messageThread.removeEventListener("scroll", handleScroll);
+    };
+  }, [activeConversation]);
+
+  useLayoutEffect(() => {
+    const messageThread = messageThreadRef.current;
+
+    if (!messageThread || !activeConversation || !shouldAutoScrollRef.current) {
+      return;
+    }
+
+    const behavior = shouldInstantScrollRef.current ? "auto" : "smooth";
+    shouldInstantScrollRef.current = false;
+
+    if (behavior === "auto") {
+      messagesEndRef.current?.scrollIntoView({ behavior, block: "end" });
+    } else {
+      const timeoutId = window.setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior, block: "end" });
+      }, 100);
+      return () => window.clearTimeout(timeoutId);
+    }
+  }, [activeConversation, latestMessageId, activeMessages.length, isDetailLoading]);
 
   useEffect(() => {
     return () => {
@@ -868,26 +874,53 @@ export function InboxWorkspace({
           data-testid="conversation-panel"
           className={classNames("min-h-0 min-w-0", isMobileDetailOpen && "hidden lg:block")}
         >
-          <div className="flex h-full flex-col overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
-            <div className="border-b border-slate-200 p-4 dark:border-slate-800">
-              <Input
-                data-testid="conversation-search"
-                disabled={!areFiltersInteractive}
-                placeholder={t("search")}
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-              />
-              <div className="mt-4 flex flex-wrap gap-2">
+          <div className="flex h-full min-h-0 flex-col overflow-hidden border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+            <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-800">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-2 text-sm font-semibold text-slate-950 dark:text-slate-100">
+                    <MessagesSquare className="h-4 w-4 text-cyan-600 dark:text-cyan-300" />
+                    <span>Conversations</span>
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    {visibleConversations.length} active threads
+                  </p>
+                </div>
+                <button
+                  aria-label={t("search")}
+                  data-testid="conversation-search-toggle"
+                  className={classNames(
+                    "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-900 dark:hover:text-white",
+                    isSearchExpanded && "border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200",
+                  )}
+                  type="button"
+                  onClick={() => setIsSearchExpanded((current) => !current)}
+                >
+                  <Search className="h-4.5 w-4.5" />
+                </button>
+              </div>
+              <div className={classNames("grid transition-all", isSearchExpanded ? "mt-3 grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0")}>
+                <div className="overflow-hidden">
+                  <Input
+                    data-testid="conversation-search"
+                    disabled={!areFiltersInteractive}
+                    placeholder={t("search")}
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
                 {filters.map((filter) => (
                   <button
                     key={filter}
                     type="button"
                     disabled={!areFiltersInteractive}
                     className={classNames(
-                      "rounded-full px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60",
+                      "rounded-full border px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
                       activeFilter === filter
-                        ? "bg-slate-950 text-white dark:bg-cyan-500 dark:text-slate-950"
-                        : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700",
+                        ? "border-cyan-200 bg-cyan-50 text-cyan-800 dark:border-cyan-800 dark:bg-cyan-950/50 dark:text-cyan-200"
+                        : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-900",
                     )}
                     onClick={() => setActiveFilter(filter)}
                   >
@@ -899,7 +932,7 @@ export function InboxWorkspace({
 
             <div
               data-testid="conversation-list"
-              className="min-h-0 flex-1 overflow-y-auto p-3"
+              className="min-h-0 flex-1 overflow-y-auto bg-slate-50/60 p-2 dark:bg-slate-950"
             >
               {isListLoading ? (
                 <div className="flex h-full items-center justify-center text-sm text-slate-500 dark:text-slate-400">
@@ -915,7 +948,7 @@ export function InboxWorkspace({
                   {t("emptySearch")}
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   {visibleConversations.map((conversation) => {
                     const isUnread = conversation.unreadCount > 0;
 
@@ -925,17 +958,17 @@ export function InboxWorkspace({
                         type="button"
                         data-testid={`conversation-item-${conversation.id}`}
                         className={classNames(
-                          "w-full rounded-[1.5rem] border px-4 py-4 text-left transition",
+                          "w-full rounded-2xl border px-3 py-3 text-left transition",
                           selectedConversationId === conversation.id
-                            ? "border-cyan-200 bg-cyan-50 dark:border-cyan-700 dark:bg-cyan-950/30"
-                            : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700 dark:hover:bg-slate-900",
+                            ? "border-cyan-200 bg-cyan-50/80 dark:border-cyan-800 dark:bg-cyan-950/30"
+                            : "border-transparent bg-white hover:border-slate-200 hover:bg-slate-50 dark:bg-slate-950 dark:hover:border-slate-800 dark:hover:bg-slate-900",
                         )}
                         onClick={() => handleSelectConversation(conversation.id)}
                       >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex min-w-0 gap-3">
                           {conversation.customerAvatarImageUrl ? (
-                            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl bg-slate-100">
+                            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-slate-100">
                               <Image
                                 alt={conversation.customerName}
                                 className="object-cover"
@@ -946,7 +979,7 @@ export function InboxWorkspace({
                               />
                             </div>
                           ) : (
-                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-sm font-semibold text-white">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-950 text-sm font-semibold text-white dark:bg-slate-800">
                               {conversation.customerAvatarFallback}
                             </div>
                           )}
@@ -962,16 +995,17 @@ export function InboxWorkspace({
                               </p>
                               <span
                                 className={classNames(
-                                  "rounded-full px-2 py-1 text-[11px] font-semibold",
+                                  "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]",
                                   channelClasses[conversation.channel],
                                 )}
                               >
                                 {conversation.channel}
                               </span>
+                              <span className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-400" />
                             </div>
                             <p
                               className={classNames(
-                                "line-clamp-2 text-sm dark:text-slate-400",
+                                "line-clamp-1 text-sm dark:text-slate-400",
                                 isUnread
                                   ? "font-bold text-slate-900 dark:text-slate-100"
                                   : "text-slate-600",
@@ -993,7 +1027,7 @@ export function InboxWorkspace({
                             {formatTimestamp(conversation.lastMessageAt)}
                           </p>
                           {conversation.unreadCount > 0 ? (
-                            <span className="mt-2 inline-flex min-w-6 items-center justify-center rounded-full bg-slate-950 px-2 py-1 text-[11px] font-semibold text-white">
+                            <span className="mt-1 inline-flex min-w-6 items-center justify-center rounded-full bg-slate-950 px-2 py-1 text-[11px] font-semibold text-white dark:bg-cyan-500 dark:text-slate-950">
                               {conversation.unreadCount}
                             </span>
                           ) : null}
@@ -1012,6 +1046,7 @@ export function InboxWorkspace({
           side="left"
           value={panelWidths.left}
           isActive={activeDivider === "left"}
+          onDoubleClick={resetPanelWidths}
           onKeyDown={(event) => handleDividerKeyDown("left", event)}
           onPointerDown={(event) => handleDividerPointerDown("left", event)}
           onPointerMove={handleDividerPointerMove}
@@ -1022,37 +1057,57 @@ export function InboxWorkspace({
           data-testid="chat-panel"
           className={classNames("min-h-0 min-w-0", !isMobileDetailOpen && "hidden lg:block")}
         >
-          <div className="flex h-full flex-col overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
-            <div className="border-b border-slate-200 p-4 dark:border-slate-800">
+          <div className="flex h-full min-h-0 flex-col overflow-hidden border-y border-slate-200 bg-[#f6fbfd] dark:border-slate-800 dark:bg-slate-950">
+            <div className="border-b border-slate-200 bg-white px-5 py-3 dark:border-slate-800 dark:bg-slate-950">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <button
+                    aria-label={tCommon("back")}
                     type="button"
-                    className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 dark:border-slate-700 dark:text-slate-300 lg:hidden"
+                    className="rounded-full border border-slate-200 p-2 text-slate-700 dark:border-slate-700 dark:text-slate-300 lg:hidden"
                     onClick={() => setIsMobileDetailOpen(false)}
                   >
-                    {tCommon("back")}
+                    <ArrowLeft className="h-4 w-4" />
                   </button>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-950 dark:text-slate-100">
+                  {activeConversation ? (
+                    activeConversation.customerAvatarImageUrl ? (
+                      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-slate-100">
+                        <Image alt={activeConversation.customerName} className="object-cover" fill sizes="40px" src={activeConversation.customerAvatarImageUrl} unoptimized />
+                      </div>
+                    ) : (
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-950 text-sm font-semibold text-white dark:bg-slate-800">
+                        {activeConversation.customerAvatarFallback}
+                      </div>
+                    )
+                  ) : null}
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-950 dark:text-slate-100">
                       {activeConversation?.customerName ?? t("selectConversation")}
                     </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                    <p className="truncate text-xs text-slate-500 dark:text-slate-400">
                       {activeConversation
                         ? t("channelConversation", { channel: activeConversation.channel })
                         : t("selectConversation")}
                     </p>
                   </div>
                 </div>
-                {activeConversation ? (
-                  <button
-                    type="button"
-                    className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 dark:border-slate-700 dark:text-slate-300 lg:hidden"
-                    onClick={() => setIsCustomerDrawerOpen(true)}
-                  >
-                    {t("customer")}
+                <div className="flex items-center gap-2">
+                  <button aria-label={t("search")} type="button" className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white">
+                    <Search className="h-4 w-4" />
                   </button>
-                ) : null}
+                  <button aria-label="More actions" type="button" className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white">
+                    <Ellipsis className="h-4 w-4" />
+                  </button>
+                  {activeConversation ? (
+                    <button
+                      type="button"
+                      className="rounded-full border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 dark:border-slate-700 dark:text-slate-300 xl:hidden"
+                      onClick={() => setIsCustomerDrawerOpen(true)}
+                    >
+                      {t("customer")}
+                    </button>
+                  ) : null}
+                </div>
               </div>
             </div>
 
@@ -1074,20 +1129,37 @@ export function InboxWorkspace({
                 <div
                   ref={messageThreadRef}
                   data-testid="message-thread"
-                  className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-4 dark:bg-[linear-gradient(180deg,#020617_0%,#0f172a_100%)]"
+                  className="min-h-0 flex-1 overflow-y-auto bg-[#f6fbfd] px-4 py-4 dark:bg-slate-950"
                 >
-                  {activeMessages.map((message) => (
-                    <MessageBubble key={message.id} message={message} />
-                  ))}
+                  <div className="space-y-4">
+                    {activeMessages.map((message, index) => {
+                      const previousMessage = activeMessages[index - 1];
+                      const currentDay = new Date(message.createdAt).toDateString();
+                      const previousDay = previousMessage
+                        ? new Date(previousMessage.createdAt).toDateString()
+                        : null;
+
+                      return (
+                        <MessageBubble
+                          key={message.id}
+                          isFirstOfDay={currentDay !== previousDay}
+                          message={message}
+                          customerAvatarUrl={activeConversation.customerAvatarImageUrl}
+                          customerAvatarFallback={activeConversation.customerAvatarFallback}
+                        />
+                      );
+                    })}
+                    <div ref={messagesEndRef} />
+                  </div>
                 </div>
 
-                <div className="border-t border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-950/80">
+                <div className="border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
                   {composerError ? (
                     <div className="mb-3">
                       <Alert tone="error">{composerError}</Alert>
                     </div>
                   ) : null}
-                  <div className="rounded-[1.75rem] border border-slate-200 bg-white p-3 shadow-[0_18px_50px_-30px_rgba(15,23,42,0.45)] dark:border-slate-800 dark:bg-slate-900">
+                  <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900">
                     <input
                       ref={imageInputRef}
                       accept="image/*"
@@ -1096,7 +1168,7 @@ export function InboxWorkspace({
                       onChange={handleImageSelection}
                     />
                     {pendingImage ? (
-                      <div className="mb-3 flex items-center gap-3 rounded-[1.4rem] bg-slate-50 p-3 ring-1 ring-slate-200 dark:bg-slate-950 dark:ring-slate-800">
+                      <div className="mb-3 flex items-center gap-3 rounded-[1.2rem] bg-white p-3 ring-1 ring-slate-200 dark:bg-slate-950 dark:ring-slate-800">
                         <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[1.1rem] bg-slate-200 dark:bg-slate-800">
                           <Image
                             alt={pendingImage.file.name}
@@ -1112,7 +1184,7 @@ export function InboxWorkspace({
                             type="button"
                             onClick={handleRemovePendingImage}
                           >
-                            <CloseIcon />
+                            <span className="text-sm">×</span>
                           </button>
                         </div>
                         <div className="min-w-0 flex-1">
@@ -1125,49 +1197,53 @@ export function InboxWorkspace({
                         </div>
                       </div>
                     ) : null}
-                    <div className="flex items-end gap-3">
-                      <div className="flex min-w-0 flex-1 flex-col gap-3">
-                        <div className="overflow-hidden rounded-[1.6rem] bg-slate-100 ring-1 ring-slate-200 transition focus-within:ring-2 focus-within:ring-blue-300 dark:bg-slate-950 dark:ring-slate-800 dark:focus-within:ring-cyan-500/60">
-                          <textarea
-                            data-testid="message-input"
-                            className="min-h-24 w-full resize-none bg-transparent px-5 py-4 text-[15px] leading-6 text-slate-950 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
-                            placeholder={t("replyPlaceholder")}
-                            value={messageDraft}
-                            onChange={(event) => setMessageDraft(event.target.value)}
-                            disabled={!activeConversation || isSending}
-                          />
+                    <div className="flex items-end gap-2">
+                      <div className="flex min-w-0 flex-1 overflow-hidden rounded-[1.6rem] bg-white ring-1 ring-slate-200 transition focus-within:ring-2 focus-within:ring-cyan-300 dark:bg-slate-950 dark:ring-slate-800 dark:focus-within:ring-cyan-500/60">
+                        <textarea
+                          data-testid="message-input"
+                          className="min-h-[48px] max-h-32 w-full resize-none bg-transparent px-5 py-3 text-[15px] leading-6 text-slate-950 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
+                          placeholder={t("replyPlaceholder")}
+                          value={messageDraft}
+                          onChange={(event) => setMessageDraft(event.target.value)}
+                          onKeyDown={handleMessageKeyDown}
+                          disabled={!activeConversation || isSending}
+                          rows={1}
+                        />
+                      </div>
+                      <div className="relative group">
+                        <button
+                          aria-label={t("attachImage")}
+                          className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600 ring-1 ring-blue-100 transition hover:bg-blue-100 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-cyan-500/10 dark:text-cyan-300 dark:ring-cyan-500/20 dark:hover:bg-cyan-500/20"
+                          disabled={!activeConversation || isSending}
+                          type="button"
+                          onClick={() => imageInputRef.current?.click()}
+                        >
+                          <Paperclip className="h-5 w-5" />
+                        </button>
+                        <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-md transition-all duration-150 group-hover:scale-100 group-hover:opacity-100 dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-700">
+                          {t("attachImage")}
+                          <div className="absolute top-full left-1/2 -mt-1 -translate-x-1/2 border-4 border-transparent border-t-slate-900 dark:border-t-slate-800" />
                         </div>
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div className="flex items-center gap-2">
-                            <button
-                              aria-label={t("attachImage")}
-                              className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-blue-600 ring-1 ring-blue-100 transition hover:bg-blue-100 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-cyan-500/10 dark:text-cyan-300 dark:ring-cyan-500/20 dark:hover:bg-cyan-500/20"
-                              disabled={!activeConversation || isSending}
-                              title={t("attachImage")}
-                              type="button"
-                              onClick={() => imageInputRef.current?.click()}
-                            >
-                              <ImageAttachIcon />
-                            </button>
-                            <button
-                              className="inline-flex h-11 items-center gap-2 rounded-full bg-slate-100 px-4 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-700"
-                              type="button"
-                              onClick={() => void handleOpenSavedReplies()}
-                            >
-                              <SavedReplyIcon />
-                              <span>{t("savedReplies")}</span>
-                            </button>
-                          </div>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">
-                            {t("storageNotice")}
-                          </p>
+                      </div>
+                      <div className="relative group">
+                        <button
+                          aria-label={t("savedReplies")}
+                          className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-700"
+                          type="button"
+                          onClick={() => void handleOpenSavedReplies()}
+                        >
+                          <Sparkles className="h-5 w-5" />
+                        </button>
+                        <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-md transition-all duration-150 group-hover:scale-100 group-hover:opacity-100 dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-700">
+                          {t("savedReplies")}
+                          <div className="absolute top-full left-1/2 -mt-1 -translate-x-1/2 border-4 border-transparent border-t-slate-900 dark:border-t-slate-800" />
                         </div>
                       </div>
                       <button
                         aria-label={isSending ? t("sending") : t("send")}
                         data-testid="send-message-button"
                         className={classNames(
-                          "inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full shadow-lg shadow-cyan-500/20 transition",
+                          "inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full shadow-lg shadow-cyan-500/20 transition",
                           !activeConversation || (!messageDraft.trim() && !pendingImage)
                             ? "cursor-not-allowed bg-slate-300 text-slate-500 dark:bg-slate-800 dark:text-slate-600"
                             : "bg-gradient-to-br from-sky-500 to-cyan-500 text-white hover:from-sky-400 hover:to-cyan-400 dark:text-slate-950",
@@ -1176,7 +1252,7 @@ export function InboxWorkspace({
                         type="button"
                         onClick={handleSendMessage}
                       >
-                        {isSending ? <Spinner className="text-current" /> : <SendIcon />}
+                        {isSending ? <Spinner className="text-current" /> : <SendHorizonal className="h-5 w-5" />}
                       </button>
                     </div>
                   </div>
@@ -1190,6 +1266,7 @@ export function InboxWorkspace({
           side="right"
           value={panelWidths.right}
           isActive={activeDivider === "right"}
+          onDoubleClick={resetPanelWidths}
           onKeyDown={(event) => handleDividerKeyDown("right", event)}
           onPointerDown={(event) => handleDividerPointerDown("right", event)}
           onPointerMove={handleDividerPointerMove}
@@ -1199,6 +1276,7 @@ export function InboxWorkspace({
         <CustomerPanel
           activeConversation={activeConversation}
           activeCustomer={activeCustomer}
+          activeMessages={activeMessages}
           isDrawerOpen={isCustomerDrawerOpen}
           onCloseDrawer={() => setIsCustomerDrawerOpen(false)}
         />

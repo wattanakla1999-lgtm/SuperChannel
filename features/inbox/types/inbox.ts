@@ -71,12 +71,12 @@ export type SendMessageResponse = {
 };
 
 export const PANEL_WIDTHS_STORAGE_KEY = "superchannel:inbox-panel-widths";
-export const DEFAULT_PANEL_WIDTHS = { left: 360, right: 320 };
-export const LEFT_PANEL_MIN = 280;
+export const DEFAULT_PANEL_WIDTHS = { left: 320, right: 360 };
+export const LEFT_PANEL_MIN = 260;
 export const LEFT_PANEL_MAX = 480;
-export const RIGHT_PANEL_MIN = 260;
-export const RIGHT_PANEL_MAX = 420;
-export const CENTER_PANEL_MIN = 280;
+export const RIGHT_PANEL_MIN = 300;
+export const RIGHT_PANEL_MAX = 520;
+export const CENTER_PANEL_MIN = 420;
 export const DIVIDER_WIDTH = 12;
 
 export type PanelSide = "left" | "right";
