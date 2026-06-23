@@ -2,6 +2,7 @@ import { Segment as PrismaSegment, SegmentMatch } from "@prisma/client";
 import { SegmentCondition } from "../schemas/segment-conditions.schema";
 
 export type { SegmentCondition };
+export type DraftSegmentCondition = SegmentCondition | { type: "select_condition" };
 
 export type Segment = Omit<PrismaSegment, "conditions"> & {
   conditions: SegmentCondition[];

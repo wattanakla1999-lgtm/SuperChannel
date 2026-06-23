@@ -7,6 +7,7 @@ export type DropdownOption = {
   disabled?: boolean;
   label: string;
   value: string;
+  group?: string;
 };
 
 type DropdownProps = {
@@ -59,6 +60,15 @@ export function Dropdown({
     setIsOpen(false);
   };
 
+  const groupedOptions = options.reduce((acc, option) => {
+    const group = option.group ?? "";
+    if (!acc[group]) acc[group] = [];
+    acc[group].push(option);
+    return acc;
+  }, {} as Record<string, DropdownOption[]>);
+
+  const groups = Object.keys(groupedOptions);
+
   return (
     <div ref={rootRef} className={classNames("relative min-w-0", className)}>
       <select
@@ -71,11 +81,24 @@ export function Dropdown({
         className="pointer-events-none absolute inset-0 h-11 w-full opacity-0"
         tabIndex={-1}
       >
-        {options.map((option) => (
-          <option key={option.value} value={option.value} disabled={option.disabled}>
-            {option.label}
-          </option>
-        ))}
+        {groups.map((group) => {
+          if (!group) {
+            return groupedOptions[group].map((option) => (
+              <option key={option.value} value={option.value} disabled={option.disabled}>
+                {option.label}
+              </option>
+            ));
+          }
+          return (
+            <optgroup key={group} label={group}>
+              {groupedOptions[group].map((option) => (
+                <option key={option.value} value={option.value} disabled={option.disabled}>
+                  {option.label}
+                </option>
+              ))}
+            </optgroup>
+          );
+        })}
       </select>
 
       <button
@@ -98,24 +121,42 @@ export function Dropdown({
           aria-label={ariaLabel}
           className="absolute z-50 mt-2 max-h-64 w-full min-w-44 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_18px_50px_-20px_rgba(15,23,42,0.45)] dark:border-slate-700 dark:bg-slate-950"
         >
-          {options.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              role="option"
-              aria-selected={option.value === value}
-              disabled={option.disabled}
-              className={classNames(
-                "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition disabled:opacity-40",
-                option.value === value
-                  ? "bg-slate-950 text-white dark:bg-cyan-500 dark:text-slate-950"
-                  : "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800",
+          {groups.map((group) => (
+            <div key={group || "nogroup"}>
+              {group && (
+                <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  {group}
+                </div>
               )}
-              onClick={() => selectOption(option.value)}
-            >
-              <span>{option.label}</span>
-              {option.value === value ? <span aria-hidden="true">✓</span> : null}
-            </button>
+              {groupedOptions[group].map((option) => {
+                const isSelected = option.value === value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    disabled={option.disabled}
+                    className={classNames(
+                      "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition outline-none disabled:cursor-not-allowed disabled:opacity-50",
+                      isSelected
+                        ? "bg-slate-50 text-slate-900 dark:bg-slate-800 dark:text-slate-100"
+                        : "text-slate-700 hover:bg-slate-50 focus-visible:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-900 dark:focus-visible:bg-slate-900",
+                    )}
+                    onClick={() => selectOption(option.value)}
+                  >
+                    <span className={classNames("truncate", isSelected && "font-medium")}>
+                      {option.label}
+                    </span>
+                    {isSelected ? (
+                      <span aria-hidden="true" className="text-cyan-600 dark:text-cyan-500">
+                        ✓
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
           ))}
         </div>
       ) : null}

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Save } from "lucide-react";
 import { segmentsApiClient } from "../services/segments-api-client";
-import { Segment, SegmentCondition } from "../types/segments";
+import { Segment, SegmentCondition, DraftSegmentCondition } from "../types/segments";
 import { SegmentConditionBuilder } from "./segment-condition-builder";
 import { SegmentConditionSchema } from "../schemas/segment-conditions.schema";
 import { Dropdown } from "@/components/ui/dropdown";
@@ -25,7 +25,7 @@ export function SegmentEditor({ segmentId, onBack }: SegmentEditorProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [matchType, setMatchType] = useState<"ALL" | "ANY">("ALL");
-  const [conditions, setConditions] = useState<SegmentCondition[]>([]);
+  const [conditions, setConditions] = useState<DraftSegmentCondition[]>([]);
   const [previewCount, setPreviewCount] = useState<number | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
@@ -37,7 +37,7 @@ export function SegmentEditor({ segmentId, onBack }: SegmentEditorProps) {
       setName(seg.name);
       setDescription(seg.description || "");
       setMatchType(seg.matchType);
-      setConditions(seg.conditions as unknown as SegmentCondition[]);
+      setConditions(seg.conditions as unknown as DraftSegmentCondition[]);
     } catch (error) {
       alert(t("errorLoadingSegments"));
     } finally {
