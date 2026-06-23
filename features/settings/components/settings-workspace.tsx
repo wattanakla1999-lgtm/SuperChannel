@@ -26,6 +26,7 @@ import {
   updateSavedReply,
   updateWorkspaceProfile,
 } from "../services/settings-service";
+import { TagsSettings } from "@/features/tags/components/tags-settings";
 import type {
   AppLocale,
   BusinessHoursSettings,
@@ -55,6 +56,11 @@ const sectionDefinitions: Array<{ description: string; id: SettingsSection; labe
     label: "Inbox Preferences",
   },
   {
+    description: "Create, edit, merge, and archive workspace tags for customers and conversations.",
+    id: "tags",
+    label: "Tags",
+  },
+  {
     description: "Reusable shortcuts shared with the Inbox composer.",
     id: "saved-replies",
     label: "Saved Replies",
@@ -71,10 +77,11 @@ const sectionDefinitions: Array<{ description: string; id: SettingsSection; labe
   },
 ];
 
-const sectionTranslationKeys: Record<SettingsSection, "workspace" | "hours" | "inbox" | "replies" | "notifications" | "security"> = {
+const sectionTranslationKeys: Record<SettingsSection, "workspace" | "hours" | "inbox" | "tags" | "replies" | "notifications" | "security"> = {
   "workspace-profile": "workspace",
   "business-hours": "hours",
   "inbox-preferences": "inbox",
+  tags: "tags",
   "saved-replies": "replies",
   notifications: "notifications",
   security: "security",
@@ -120,6 +127,7 @@ export function SettingsWorkspace() {
   const locale = useLocale();
   const t = useTranslations("settings");
   const tCommon = useTranslations("common");
+  const tTags = useTranslations("tags");
   const languageOptions: Array<{ label: string; value: AppLocale }> = [
     { label: tCommon("english"), value: "en" },
     { label: tCommon("thai"), value: "th" },
@@ -875,6 +883,21 @@ export function SettingsWorkspace() {
                     />
                   </div>
                 </div>
+              </SectionFrame>
+            ) : null}
+
+            {activeSection === "tags" ? (
+              <SectionFrame
+                canManageSettings={canManageSettings}
+                description={tTags("description")}
+                onReset={() => {}}
+                onSave={() => {}}
+                showActions={false}
+                title={tTags("title")}
+                isSaving={false}
+                isDirty={false}
+              >
+                <TagsSettings canManageSettings={canManageSettings} />
               </SectionFrame>
             ) : null}
 

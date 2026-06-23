@@ -53,7 +53,7 @@ function toConversationSummary(conversation: {
   lastMessageAt: Date | null;
   previewText: string | null;
   status: "OPEN" | "PENDING" | "RESOLVED";
-  tags: Array<{ tag: { name: string } }>;
+  tags: Array<{ tag: { id: string; name: string; color: string | null } }>;
   unreadCount: number;
 }): ConversationSummary {
   return {
@@ -67,7 +67,7 @@ function toConversationSummary(conversation: {
     lastMessageAt: conversation.lastMessageAt?.toISOString() ?? conversation.createdAt.toISOString(),
     preview: conversation.previewText ?? "",
     status: conversation.status.toLowerCase() as "open" | "pending" | "resolved",
-    tags: conversation.tags.map(({ tag }) => tag.name),
+    tags: conversation.tags.map(({ tag }) => ({ id: tag.id, name: tag.name, color: tag.color })),
     unreadCount: conversation.unreadCount,
   };
 }

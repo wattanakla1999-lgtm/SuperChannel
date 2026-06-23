@@ -118,7 +118,7 @@ function toCustomerSummary(customer: {
   phone: string | null;
   primaryConversationId: string | null;
   status: "OPEN" | "PENDING" | "RESOLVED";
-  tags: Array<{ tag: { name: string } }>;
+  tags: Array<{ tag: { id: string; name: string; color: string | null } }>;
   unreadCount: number;
   avatarImageUrl?: string | null;
 }): CustomerSummary {
@@ -139,7 +139,7 @@ function toCustomerSummary(customer: {
     phone: customer.phone ?? "",
     primaryConversationId: customer.primaryConversationId,
     status: toStatusLabel(customer.status),
-    tags: customer.tags.map(({ tag }) => tag.name),
+    tags: customer.tags.map(({ tag }) => ({ id: tag.id, name: tag.name, color: tag.color })),
     unreadCount: customer.unreadCount,
   };
 }
@@ -167,7 +167,8 @@ export async function listCustomersFromDatabase(
     pageSize: number;
     search?: string;
     status?: "open" | "pending" | "resolved";
-    tag?: string;
+    tags?: string[];
+    tagOperator?: "AND" | "OR";
   },
 ): Promise<CustomerListResponse> {
   const where: Prisma.CustomerWhereInput = {
@@ -194,15 +195,29 @@ export async function listCustomersFromDatabase(
         ]
       : undefined,
     status: query.status ? (query.status.toUpperCase() as ConversationStatus) : undefined,
-    tags: query.tag
-      ? {
-          some: {
-            tag: {
-              name: query.tag,
+    ...(query.tags && query.tags.length > 0
+      ? query.tagOperator === "OR"
+        ? {
+            tags: {
+              some: {
+                tag: {
+                  name: { in: query.tags },
+                },
+              },
             },
-          },
-        }
-      : undefined,
+          }
+        : {
+            AND: query.tags.map((tag) => ({
+              tags: {
+                some: {
+                  tag: {
+                    name: tag,
+                  },
+                },
+              },
+            })),
+          }
+      : {}),
   };
 
   const [customers, totalItems, allMembers, allTags] = await Promise.all([
@@ -251,7 +266,7 @@ export async function listCustomersFromDatabase(
       })),
       channels: ["Facebook", "Instagram", "LINE", "Telegram"],
       statuses: ["open", "pending", "resolved"],
-      tags: allTags.map((tag) => tag.name),
+      tags: allTags.map((tag) => ({ id: tag.id, name: tag.name, color: tag.color })),
     },
     pagination: {
       page: query.page,
@@ -431,7 +446,7 @@ export async function listConversationSummariesFromDatabase(session: Authenticat
       lastMessageAt: conversation.lastMessageAt?.toISOString() ?? conversation.createdAt.toISOString(),
       preview: conversation.previewText ?? "",
       status: toStatusLabel(conversation.status),
-      tags: conversation.tags.map(({ tag }) => tag.name),
+      tags: conversation.tags.map(({ tag }) => ({ id: tag.id, name: tag.name, color: tag.color })),
       unreadCount: conversation.unreadCount,
     })),
   );
@@ -447,6 +462,7 @@ export async function getConversationDetailFromDatabase(
       customer: {
         include: {
           channelIdentities: true,
+          tags: { include: { tag: true } },
         },
       },
     messages: {
@@ -503,7 +519,7 @@ export async function getConversationDetailFromDatabase(
     lastMessageAt: conversation.lastMessageAt?.toISOString() ?? conversation.createdAt.toISOString(),
     preview: conversation.previewText ?? "",
     status: toStatusLabel(conversation.status),
-    tags: conversation.tags.map(({ tag }) => tag.name),
+    tags: conversation.tags.map(({ tag }) => ({ id: tag.id, name: tag.name, color: tag.color })),
     unreadCount: conversation.unreadCount,
   };
 
@@ -513,6 +529,7 @@ export async function getConversationDetailFromDatabase(
       avatarImageUrl: await resolveLineAvatarImageUrl(conversation.customer.channelIdentities),
       avatarFallback:
         conversation.customer.avatarFallback ?? conversation.customer.name.slice(0, 2).toUpperCase(),
+      customerTags: conversation.customer.tags.map(({ tag }) => ({ id: tag.id, name: tag.name, color: tag.color })),
       email: conversation.customer.email ?? "",
       id: conversation.customer.id,
       location: conversation.customer.location ?? "",
@@ -629,7 +646,7 @@ export async function appendConversationMessageFromDatabase(
       lastMessageAt: message.createdAt.toISOString(),
       preview: body,
       status: toStatusLabel(conversation.status),
-      tags: conversation.tags.map(({ tag }) => tag.name),
+      tags: conversation.tags.map(({ tag }) => ({ id: tag.id, name: tag.name, color: tag.color })),
       unreadCount: 0,
     },
     message: {
@@ -747,7 +764,7 @@ export async function appendConversationImageFromDatabase(
       lastMessageAt: createdAt.toISOString(),
       preview: "Image attachment",
       status: toStatusLabel(conversation.status),
-      tags: conversation.tags.map(({ tag }) => tag.name),
+      tags: conversation.tags.map(({ tag }) => ({ id: tag.id, name: tag.name, color: tag.color })),
       unreadCount: 0,
     },
     message: {

@@ -135,7 +135,7 @@ export function CustomerOrdersPanel({
   const [error, setError] = useState<string | null>(null);
   const [isForbiddenState, setIsForbiddenState] = useState(false);
   const [retryToken, setRetryToken] = useState(0);
-  const [unauthorizedRetries, setUnauthorizedRetries] = useState(0);
+  const [, setUnauthorizedRetries] = useState(0);
 
   useEffect(() => {
     let isMounted = true;

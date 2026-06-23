@@ -17,7 +17,10 @@ export async function GET(request: Request) {
   const page = Number(searchParams.get("page") ?? "1");
   const pageSize = Number(searchParams.get("pageSize") ?? "8");
   const channel = searchParams.get("channel");
-  const status = searchParams.get("status");
+  const statusParam = searchParams.get("status");
+  const status = statusParam && allowedStatuses.has(statusParam)
+    ? (statusParam as "open" | "pending" | "resolved")
+    : undefined;
 
   const result = await listCustomersFromDatabase(session, {
     assignedAgent: searchParams.get("assignedAgent") ?? undefined,
@@ -28,12 +31,10 @@ export async function GET(request: Request) {
     page: Number.isFinite(page) && page > 0 ? page : 1,
     pageSize:
       Number.isFinite(pageSize) && pageSize > 0 && pageSize <= 20 ? pageSize : 8,
-    search: searchParams.get("search") ?? undefined,
-    status:
-      status && allowedStatuses.has(status)
-        ? (status as "open" | "pending" | "resolved")
-        : undefined,
-    tag: searchParams.get("tag") ?? undefined,
+    search: searchParams.get("search") || undefined,
+    status,
+    tags: searchParams.getAll("tags"),
+    tagOperator: searchParams.get("tagOperator") as "AND" | "OR" | undefined,
   });
 
   return NextResponse.json(result);

@@ -15,6 +15,7 @@ export type Customer = {
   avatarImageUrl?: string | null;
   id: string;
   avatarFallback: string;
+  customerTags: { id: string; name: string; color: string | null }[];
   email: string;
   location: string;
   name: string;
@@ -33,7 +34,7 @@ export type ConversationSummary = {
   lastMessageAt: string;
   preview: string;
   status: ThreadStatus;
-  tags: string[];
+  tags: { id: string; name: string; color: string | null }[];
   unreadCount: number;
 };
 

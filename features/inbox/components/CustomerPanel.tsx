@@ -2,12 +2,21 @@
 
 import Image from "next/image";
 import { FileImage, FileText, Images, Package2, Paperclip, UserRound } from "lucide-react";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { CustomerOrdersPanel } from "@/features/orders/components/customer-orders-panel";
 import { classNames } from "@/lib/class-names";
 import { useFormatter, useTranslations } from "next-intl";
 import { ConversationDetail, ConversationMessage, ConversationSummary } from "../types/inbox";
 import DetailSection from "./DetailSection";
+import { Tooltip } from "@/components/ui/tooltip";
+import { TagPicker } from "@/features/tags/components/tag-picker";
+import {
+  assignTagToCustomer,
+  removeTagFromCustomer,
+  assignTagToConversation,
+  removeTagFromConversation,
+  createTag,
+} from "@/features/tags/services/tags-api-client";
 
 type CustomerPanelProps = {
   activeConversation: ConversationSummary | null;
@@ -46,6 +55,38 @@ export default function CustomerPanel({
   const tCommon = useTranslations("common");
   const format = useFormatter();
   const [activeTab, setActiveTab] = useState<ContextTab>("customer");
+
+  const handleAssignCustomerTag = useCallback(async (tagId: string) => {
+    if (!activeCustomer) return;
+    await assignTagToCustomer(activeCustomer.id, tagId);
+  }, [activeCustomer]);
+
+  const handleRemoveCustomerTag = useCallback(async (tagId: string) => {
+    if (!activeCustomer) return;
+    await removeTagFromCustomer(activeCustomer.id, tagId);
+  }, [activeCustomer]);
+
+  const handleAssignConversationTag = useCallback(async (tagId: string) => {
+    if (!activeConversation) return;
+    await assignTagToConversation(activeConversation.id, tagId);
+  }, [activeConversation]);
+
+  const handleRemoveConversationTag = useCallback(async (tagId: string) => {
+    if (!activeConversation) return;
+    await removeTagFromConversation(activeConversation.id, tagId);
+  }, [activeConversation]);
+
+  const handleCreateCustomerTag = useCallback(async (name: string) => {
+    if (!activeCustomer) return;
+    const tag = await createTag({ name, target: "CUSTOMER" });
+    await assignTagToCustomer(activeCustomer.id, tag.id);
+  }, [activeCustomer]);
+
+  const handleCreateConversationTag = useCallback(async (name: string) => {
+    if (!activeConversation) return;
+    const tag = await createTag({ name, target: "CONVERSATION" });
+    await assignTagToConversation(activeConversation.id, tag.id);
+  }, [activeConversation]);
 
   const photoMessages = activeMessages.filter(
     (message) => (message.type === "image" || message.type === "sticker") && message.imageUrl,
@@ -225,7 +266,38 @@ export default function CustomerPanel({
               <div className="space-y-4">
                 <DetailSection label={t("assignedAgent")} value={activeConversation.assignedAgent} />
                 <DetailSection label={tCommon("status")} value={activeConversation.status} badge />
-                <DetailSection label={t("tags")} value={activeConversation.tags.join(", ")} />
+                <div>
+                  <div className="mb-1.5 flex items-center gap-1.5">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                      {t("conversationTopics")}
+                    </p>
+                    <Tooltip content={t("conversationTopicsDesc")} align="left" />
+                  </div>
+                  <TagPicker
+                    target="CONVERSATION"
+                    placeholder={t("addConversationTopic")}
+                    selectedTagIds={activeConversation.tags.map(t => t.id)}
+                    onAssign={handleAssignConversationTag}
+                    onRemove={handleRemoveConversationTag}
+                    onCreateInline={handleCreateConversationTag}
+                  />
+                </div>
+                <div>
+                  <div className="mb-1.5 flex items-center gap-1.5">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                      {t("customerLabels")}
+                    </p>
+                    <Tooltip content={t("customerLabelsDesc")} align="left" />
+                  </div>
+                  <TagPicker
+                    target="CUSTOMER"
+                    placeholder={t("addCustomerLabel")}
+                    selectedTagIds={activeCustomer.customerTags.map(t => t.id)}
+                    onAssign={handleAssignCustomerTag}
+                    onRemove={handleRemoveCustomerTag}
+                    onCreateInline={handleCreateCustomerTag}
+                  />
+                </div>
                 <DetailSection label={t("email")} value={activeCustomer.email} />
                 <DetailSection label={t("phone")} value={activeCustomer.phone} />
                 <DetailSection label={t("notes")} value={activeCustomer.notes} />

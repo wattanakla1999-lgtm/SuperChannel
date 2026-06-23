@@ -18,17 +18,19 @@ function toQueryString(query: CustomerQuery) {
     params.set("channel", query.channel);
   }
 
-  if (query.tag) {
-    params.set("tag", query.tag);
+  if (query.tags && query.tags.length > 0) {
+    query.tags.forEach(tag => params.append("tags", tag));
+  }
+
+  if (query.tagOperator) {
+    params.set("tagOperator", query.tagOperator);
   }
 
   if (query.assignedAgent) {
     params.set("assignedAgent", query.assignedAgent);
   }
 
-  if (query.status && query.status !== "all") {
-    params.set("status", query.status);
-  }
+  if (query.status && query.status !== "all") params.append("status", query.status);
 
   if (query.page) {
     params.set("page", String(query.page));

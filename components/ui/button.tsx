@@ -29,7 +29,7 @@ export function Button({
     <button
       type={type}
       className={classNames(
-        "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-950 disabled:cursor-not-allowed disabled:text-white dark:focus-visible:outline-cyan-400",
+        "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-950 disabled:cursor-not-allowed disabled:text-white dark:focus-visible:outline-cyan-400 whitespace-nowrap",
         variantClasses[variant],
         className,
       )}
@@ -37,7 +37,7 @@ export function Button({
       {...props}
     >
       {loading ? <Spinner className="text-current" /> : null}
-      <span>{children}</span>
+      <span className="inline-flex items-center whitespace-nowrap">{children}</span>
     </button>
   );
 }

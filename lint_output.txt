@@ -1,0 +1,95 @@
+
+> superchannel@0.1.0 lint
+> eslint
+
+
+/Users/kla/Desktop/TotalChat/superchannel/app/api/segments/[segmentId]/duplicate/route.ts
+  34:51  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/kla/Desktop/TotalChat/superchannel/app/api/segments/[segmentId]/route.ts
+  99:39  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/kla/Desktop/TotalChat/superchannel/app/api/segments/route.ts
+  77:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/kla/Desktop/TotalChat/superchannel/features/segments/components/segment-condition-builder.tsx
+   71:102  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   79:118  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   93:102  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  101:118  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  125:102  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  134:84   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/kla/Desktop/TotalChat/superchannel/features/segments/components/segment-editor.tsx
+   9:10  warning  'Segment' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-unused-vars
+  20:10  warning  'isLoading' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  @typescript-eslint/no-unused-vars
+  30:3   warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')
+  33:7   warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/set-state-in-effect')
+  34:7   error    Error: Cannot access variable before it is declared
+
+`loadSegment` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+/Users/kla/Desktop/TotalChat/superchannel/features/segments/components/segment-editor.tsx:34:7
+  32 |     if (segmentId) {
+  33 |       // eslint-disable-next-line react-hooks/set-state-in-effect
+> 34 |       loadSegment();
+     |       ^^^^^^^^^^^ `loadSegment` accessed before it is declared
+  35 |     }
+  36 |   }, [segmentId]);
+  37 |
+
+/Users/kla/Desktop/TotalChat/superchannel/features/segments/components/segment-editor.tsx:38:3
+  36 |   }, [segmentId]);
+  37 |
+> 38 |   const loadSegment = async () => {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 39 |     if (!segmentId) return;
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 40 |     setIsLoading(true);
+     …
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 51 |     }
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 52 |   };
+     | ^^^^^ `loadSegment` is declared here
+  53 |
+  54 |   // eslint-disable-next-line react-hooks/exhaustive-deps
+  55 |   useEffect(() => {  react-hooks/immutability
+  36:6   warning  React Hook useEffect has a missing dependency: 'loadSegment'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  react-hooks/exhaustive-deps
+  47:14  warning  'error' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               @typescript-eslint/no-unused-vars
+  54:3   warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')
+  65:99  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        @typescript-eslint/no-explicit-any
+  67:16  warning  'error' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               @typescript-eslint/no-unused-vars
+  85:35  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        @typescript-eslint/no-explicit-any
+  94:14  warning  'error' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               @typescript-eslint/no-unused-vars
+
+/Users/kla/Desktop/TotalChat/superchannel/features/segments/components/segment-list.tsx
+  31:14  warning  'error' is defined but never used                                                                                 @typescript-eslint/no-unused-vars
+  38:3   warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')
+  42:6   warning  React Hook useEffect has a missing dependency: 'fetchSegments'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  48:14  warning  'error' is defined but never used                                                                                 @typescript-eslint/no-unused-vars
+  58:14  warning  'error' is defined but never used                                                                                 @typescript-eslint/no-unused-vars
+
+/Users/kla/Desktop/TotalChat/superchannel/features/tags/components/tag-picker.tsx
+  24:9   warning  'tCommon' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+  33:5   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/kla/Desktop/TotalChat/superchannel/features/tags/components/tag-picker.tsx:33:5
+  31 |   
+  32 |   useEffect(() => {
+> 33 |     setOptimisticSelectedIds(selectedTagIds);
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  34 |   }, [selectedTagIds]);
+  35 |
+  36 |   const ref = useRef<HTMLDivElement>(null);  react-hooks/set-state-in-effect
+  82:14  warning  'err' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      @typescript-eslint/no-unused-vars
+
+✖ 29 problems (13 errors, 16 warnings)
+  0 errors and 4 warnings potentially fixable with the `--fix` option.
+

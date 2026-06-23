@@ -20,7 +20,7 @@ export type CustomerSummary = {
   phone: string;
   primaryConversationId: string | null;
   status: ThreadStatus;
-  tags: string[];
+  tags: { id: string; name: string; color: string | null }[];
   unreadCount: number;
 };
 
@@ -51,7 +51,7 @@ export type CustomerListFilters = {
   agents: TeamOption[];
   channels: InboxChannel[];
   statuses: ThreadStatus[];
-  tags: string[];
+  tags: { id: string; name: string; color: string | null }[];
 };
 
 export type CustomerListResponse = {
@@ -73,7 +73,8 @@ export type CustomerQuery = {
   pageSize?: number;
   search?: string;
   status?: ThreadStatus | "all";
-  tag?: string;
+  tags?: string[];
+  tagOperator?: "AND" | "OR";
 };
 
 export type UpdateCustomerInput = {

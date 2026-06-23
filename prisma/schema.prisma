@@ -63,6 +63,22 @@ enum ChannelType {
   @@map("channel_type")
 }
 
+enum TagTarget {
+  CUSTOMER     @map("customer")
+  CONVERSATION @map("conversation")
+
+  @@map("tag_target")
+}
+
+enum TagAssignmentSource {
+  MANUAL     @map("manual")
+  AUTOMATION @map("automation")
+  IMPORT     @map("import")
+  API        @map("api")
+
+  @@map("tag_assignment_source")
+}
+
 enum ConversationStatus {
   OPEN     @map("open")
   PENDING  @map("pending")
@@ -183,6 +199,21 @@ enum WebhookEventStatus {
   @@map("webhook_event_status")
 }
 
+enum SegmentMatch {
+  ALL @map("all")
+  ANY @map("any")
+
+  @@map("segment_match")
+}
+
+enum MarketingConsentStatus {
+  UNKNOWN   @map("unknown")
+  OPTED_IN  @map("opted_in")
+  OPTED_OUT @map("opted_out")
+
+  @@map("marketing_consent_status")
+}
+
 enum AuditActorType {
   USER    @map("user")
   SYSTEM  @map("system")
@@ -220,8 +251,11 @@ model Organization {
   publishingTargets PublishingTarget[]
   savedReplies     SavedReply[]
   tags             Tag[]
+  tagAuditLogs     TagAuditLog[]
   webhookEvents    WebhookEvent[]
   workspaceSettings WorkspaceSettings?
+  segments         Segment[]
+  segmentMemberships SegmentMembership[]
 
   @@map("organizations")
 }
@@ -288,6 +322,9 @@ model Member {
   assignments         ConversationAssignment[] @relation("AssignedMember")
   assignmentsCreated  ConversationAssignment[] @relation("AssigningMember")
   auditLogs           AuditLog[]         @relation("AuditActorMember")
+  tagAssignments      CustomerTag[]      @relation("CustomerTagAssigningMember")
+  conversationTagAssignments ConversationTag[] @relation("ConversationTagAssigningMember")
+  tagAuditLogs        TagAuditLog[]      @relation("TagAuditActorMember")
 
   @@unique([organizationId, profileId])
   @@map("members")
@@ -362,8 +399,11 @@ model Customer {
   email              String?
   phone              String?
   location           String?
-  notes              String?
-  status             ConversationStatus
+  notes                    String?
+  marketingConsentStatus   MarketingConsentStatus @default(UNKNOWN) @map("marketing_consent_status")
+  marketingConsentUpdatedAt DateTime?             @map("marketing_consent_updated_at") @db.Timestamptz(6)
+  marketingConsentSource   String?                @map("marketing_consent_source")
+  status                   ConversationStatus
   unreadCount        Int                @default(0) @map("unread_count")
   lastInteractionAt  DateTime?          @map("last_interaction_at") @db.Timestamptz(6)
   createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -377,8 +417,10 @@ model Customer {
   primaryConversation Conversation?     @relation("CustomerPrimaryConversation", fields: [primaryConversationId], references: [id], onDelete: SetNull)
   tags               CustomerTag[]
   invoices           Invoice[]
+  segmentMemberships SegmentMembership[]
 
   @@unique([organizationId, email])
+  @@unique([organizationId, id])
   @@map("customers")
 }
 
@@ -468,38 +510,48 @@ model Tag {
   id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String            @map("organization_id") @db.Uuid
   name           String
+  description    String?
   color          String?
+  target         TagTarget         @default(CUSTOMER)
+  isArchived     Boolean           @default(false) @map("is_archived")
   createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
   conversationTags ConversationTag[]
   customerTags   CustomerTag[]
+  auditLogs      TagAuditLog[]
   organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  @@unique([organizationId, name])
+  @@unique([organizationId, target, name])
   @@map("tags")
 }
 
 model ConversationTag {
-  organizationId String       @map("organization_id") @db.Uuid
-  conversationId String       @map("conversation_id")
-  tagId          String       @map("tag_id") @db.Uuid
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  tag            Tag          @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  organizationId     String              @map("organization_id") @db.Uuid
+  conversationId     String              @map("conversation_id")
+  tagId              String              @map("tag_id") @db.Uuid
+  assignedByMemberId String?             @map("assigned_by_member_id") @db.Uuid
+  source             TagAssignmentSource @default(MANUAL)
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  assignedByMember   Member?             @relation("ConversationTagAssigningMember", fields: [assignedByMemberId], references: [id], onDelete: SetNull)
+  conversation       Conversation        @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tag                Tag                 @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([conversationId, tagId])
   @@map("conversation_tags")
 }
 
 model CustomerTag {
-  organizationId String       @map("organization_id") @db.Uuid
-  customerId     String       @map("customer_id")
-  tagId          String       @map("tag_id") @db.Uuid
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  customer       Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  tag            Tag          @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  organizationId     String              @map("organization_id") @db.Uuid
+  customerId         String              @map("customer_id")
+  tagId              String              @map("tag_id") @db.Uuid
+  assignedByMemberId String?             @map("assigned_by_member_id") @db.Uuid
+  source             TagAssignmentSource @default(MANUAL)
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  assignedByMember   Member?             @relation("CustomerTagAssigningMember", fields: [assignedByMemberId], references: [id], onDelete: SetNull)
+  customer           Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tag                Tag                 @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([customerId, tagId])
   @@map("customer_tags")
@@ -558,7 +610,7 @@ model PublishingPost {
   organizationId  String                 @map("organization_id") @db.Uuid
   authorMemberId  String?                @map("author_member_id") @db.Uuid
   caption         String
-  mediaMetadata   Json?
+  mediaMetadata   Json?                  @map("media_metadata")
   submitMode      PublishSubmitMode      @map("submit_mode")
   status          PublishingStatus
   scheduledFor    DateTime?              @map("scheduled_for") @db.Timestamptz(6)
@@ -707,4 +759,56 @@ model AuditLog {
   organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@map("audit_logs")
+}
+
+model Segment {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId    String              @map("organization_id") @db.Uuid
+  name              String
+  description       String?
+  matchType         SegmentMatch        @default(ALL) @map("match_type")
+  conditions        Json
+  conditionsVersion Int                 @default(1) @map("conditions_version")
+  isArchived        Boolean             @default(false) @map("is_archived")
+  lastCalculatedAt  DateTime?           @map("last_calculated_at") @db.Timestamptz(6)
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  memberships       SegmentMembership[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId, isArchived])
+  @@map("segments")
+}
+
+model SegmentMembership {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  segmentId      String       @map("segment_id") @db.Uuid
+  customerId     String       @map("customer_id")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  segment        Segment      @relation(fields: [organizationId, segmentId], references: [organizationId, id], onDelete: Cascade)
+  customer       Customer     @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([segmentId, customerId])
+  @@index([organizationId, segmentId])
+  @@index([customerId])
+  @@map("segment_memberships")
+}
+
+model TagAuditLog {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String         @map("organization_id") @db.Uuid
+  actorMemberId   String?        @map("actor_member_id") @db.Uuid
+  tagId           String         @map("tag_id") @db.Uuid
+  action          String
+  targetId        String?        @map("target_id")
+  metadata        Json?
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  actorMember     Member?        @relation("TagAuditActorMember", fields: [actorMemberId], references: [id], onDelete: SetNull)
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tag             Tag            @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@map("tag_audit_logs")
 }

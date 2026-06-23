@@ -9,8 +9,17 @@ import Link from "next/link";
 import type { ReactNode, SVGProps } from "react";
 import { useState, useSyncExternalStore } from "react";
 import { logout } from "../services/inbox-service";
+import { Users, UserRound, PieChart, ChevronDown, ChevronRight } from "lucide-react";
 
-type NavigationKey = "dashboard" | "customers" | "inbox" | "publishing" | "integrations" | "team" | "settings";
+type NavigationKey = "dashboard" | "customers" | "segments" | "inbox" | "publishing" | "integrations" | "team" | "settings";
+
+type NavigationItem = {
+  href: string;
+  key: NavigationKey;
+  labelKey?: string;
+  icon: React.ElementType;
+  children?: NavigationItem[];
+};
 
 type AuthenticatedShellProps = {
   activeNavigation: NavigationKey;
@@ -38,7 +47,7 @@ function SidebarIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-const navigationItems = [
+const navigationItems: NavigationItem[] = [
   {
     href: "/dashboard",
     key: "dashboard",
@@ -83,12 +92,20 @@ const navigationItems = [
   {
     href: "/customers",
     key: "customers",
-    icon: (props: SVGProps<SVGSVGElement>) => (
-      <SidebarIcon {...props}>
-        <path d="M10 10a2.75 2.75 0 1 0 0-5.5A2.75 2.75 0 0 0 10 10Z" />
-        <path d="M5 15c.8-2.1 2.7-3.25 5-3.25s4.2 1.15 5 3.25" />
-      </SidebarIcon>
-    ),
+    icon: Users,
+    children: [
+      {
+        href: "/customers",
+        key: "customers",
+        labelKey: "allCustomers",
+        icon: UserRound,
+      },
+      {
+        href: "/segments",
+        key: "segments",
+        icon: PieChart,
+      },
+    ],
   },
   {
     href: "/team",
@@ -119,7 +136,7 @@ const navigationItems = [
       </SidebarIcon>
     ),
   },
-] as const;
+];
 
 export function AuthenticatedShell({
   activeNavigation,
@@ -131,6 +148,19 @@ export function AuthenticatedShell({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    navigationItems.forEach((item) => {
+      if (item.children?.some((child) => child.key === activeNavigation)) {
+        initial[item.key] = true;
+      }
+    });
+    return initial;
+  });
+
+  const toggleMenu = (key: string) => {
+    setExpandedMenus((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
   const isHydrated = useSyncExternalStore(
     () => () => undefined,
     () => true,
@@ -228,32 +258,103 @@ export function AuthenticatedShell({
             <div className="flex h-full flex-col">
             <nav className="space-y-2 py-4">
               {navigationItems.map((item) => {
-                const label = tNav(item.key);
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const label = tNav((item.labelKey || item.key) as any);
+                const isParentActive = item.key === activeNavigation || item.children?.some((c) => c.key === activeNavigation);
+                const isExpanded = expandedMenus[item.key];
+
                 return (
-                  <Link
-                    key={item.key}
-                    href={item.href}
-                    aria-current={activeNavigation === item.key ? "page" : undefined}
-                    title={isSidebarCollapsed ? label : undefined}
-                    className={classNames(
-                      "flex items-center rounded-2xl px-4 py-3 text-sm font-medium transition",
-                      isSidebarCollapsed ? "justify-center lg:px-3" : "justify-between gap-3",
-                      activeNavigation === item.key
-                        ? "bg-cyan-400 text-slate-950"
-                        : "bg-white/5 text-slate-300 hover:bg-white/10",
+                  <div key={item.key}>
+                    {item.children ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isSidebarCollapsed && window.innerWidth >= 1024) {
+                            setIsSidebarCollapsed(false);
+                            setExpandedMenus((prev) => ({ ...prev, [item.key]: true }));
+                          } else {
+                            toggleMenu(item.key);
+                          }
+                        }}
+                        aria-expanded={isExpanded}
+                        title={isSidebarCollapsed ? label : undefined}
+                        className={classNames(
+                          "flex w-full items-center rounded-2xl px-4 py-3 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-950",
+                          isSidebarCollapsed ? "justify-center lg:px-3" : "justify-between gap-3",
+                          isParentActive && !isExpanded && isSidebarCollapsed
+                            ? "bg-cyan-400 text-slate-950"
+                            : isParentActive
+                              ? "bg-cyan-400/5 text-cyan-300"
+                              : "text-slate-300 hover:bg-white/10 hover:text-white"
+                        )}
+                      >
+                        <span className="flex min-w-0 items-center gap-3">
+                          <item.icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+                          <span className={classNames(isSidebarCollapsed && "lg:hidden")}>{label}</span>
+                        </span>
+                        {!isSidebarCollapsed && (
+                          <span className="shrink-0">
+                            {isExpanded ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                          </span>
+                        )}
+                      </button>
+                    ) : (
+                      <Link
+                        href={item.href}
+                        aria-current={activeNavigation === item.key ? "page" : undefined}
+                        title={isSidebarCollapsed ? label : undefined}
+                        className={classNames(
+                          "flex items-center rounded-2xl px-4 py-3 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-950",
+                          isSidebarCollapsed ? "justify-center lg:px-3" : "justify-between gap-3",
+                          activeNavigation === item.key
+                            ? "bg-cyan-400 text-slate-950"
+                            : "bg-white/5 text-slate-300 hover:bg-white/10",
+                        )}
+                      >
+                        <span className="flex min-w-0 items-center gap-3">
+                          <item.icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+                          <span className={classNames(isSidebarCollapsed && "lg:hidden")}>{label}</span>
+                        </span>
+                        {!isSidebarCollapsed && activeNavigation === item.key ? (
+                          <span className="rounded-full bg-slate-950/10 px-2 py-1 text-[11px]">
+                            {t("open")}
+                          </span>
+                        ) : null}
+                      </Link>
                     )}
-                  >
-                    <span className="flex min-w-0 items-center gap-3">
-                      <item.icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-                      <span className={classNames(isSidebarCollapsed && "lg:hidden")}>{label}</span>
-                    </span>
-                    {!isSidebarCollapsed && activeNavigation === item.key ? (
-                      <span className="rounded-full bg-slate-950/10 px-2 py-1 text-[11px]">
-                        {t("open")}
-                      </span>
-                    ) : null}
-                  </Link>
-              );})}
+
+                    {item.children && (!isSidebarCollapsed || isMenuOpen) && isExpanded && (
+                      <div className="mt-1 space-y-1 pl-4 lg:pl-5">
+                        {item.children.map((child) => {
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          const childLabel = tNav((child.labelKey || child.key) as any);
+                          const isChildActive = activeNavigation === child.key;
+                          return (
+                            <Link
+                              key={child.key}
+                              href={child.href}
+                              aria-current={isChildActive ? "page" : undefined}
+                              className={classNames(
+                                "flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-950",
+                                isChildActive
+                                  ? "bg-cyan-400/10 text-cyan-400"
+                                  : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                              )}
+                            >
+                              <child.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                              <span className="truncate">{childLabel}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </nav>
 
             <div

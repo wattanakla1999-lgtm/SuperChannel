@@ -8,6 +8,7 @@ export type SettingsSection =
   | "workspace-profile"
   | "business-hours"
   | "inbox-preferences"
+  | "tags"
   | "saved-replies"
   | "notifications"
   | "security";

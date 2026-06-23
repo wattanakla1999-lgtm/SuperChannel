@@ -18,7 +18,6 @@ import {
   addCustomerNote,
   getCustomer,
   getCustomers,
-  updateCustomer,
 } from "../services/customer-service";
 import type {
   CustomerDetail,
@@ -28,6 +27,8 @@ import type {
 } from "../types/customers";
 import { CustomerDrawer } from "./customer-drawer";
 import type { InboxChannel, ThreadStatus } from "@/features/inbox/types/inbox";
+import { TagPicker } from "@/features/tags/components/tag-picker";
+import { createTag } from "@/features/tags/services/tags-api-client";
 
 const PAGE_SIZE = 8;
 
@@ -58,13 +59,13 @@ export function CustomersWorkspace() {
   const [page, setPage] = useState(1);
   const [totalCustomers, setTotalCustomers] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerDetail | null>(null);
   const [isDrawerLoading, setIsDrawerLoading] = useState(false);
   const [drawerError, setDrawerError] = useState<string | null>(null);
-  const [drawerTags, setDrawerTags] = useState<string[]>([]);
   const [noteDraft, setNoteDraft] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -78,7 +79,7 @@ export function CustomersWorkspace() {
       pageSize: PAGE_SIZE,
       search: searchTerm || undefined,
       status: statusFilter === "all" ? "all" : statusFilter,
-      tag: tagFilter || undefined,
+      tags: tagFilter ? [tagFilter] : undefined,
     }),
     [agentFilter, channelFilter, page, searchTerm, statusFilter, tagFilter],
   );
@@ -151,7 +152,6 @@ export function CustomersWorkspace() {
     try {
       const detail = await getCustomer(customerId);
       setSelectedCustomer(detail);
-      setDrawerTags(detail.tags);
       setNoteDraft("");
     } catch (error) {
       setDrawerError(
@@ -172,15 +172,6 @@ export function CustomersWorkspace() {
     try {
       let nextCustomer = selectedCustomer;
 
-      if (
-        drawerTags.length > 0 &&
-        drawerTags.join("|") !== selectedCustomer.tags.join("|")
-      ) {
-        nextCustomer = await updateCustomer(selectedCustomer.id, {
-          tags: drawerTags,
-        });
-      }
-
       if (noteDraft.trim()) {
         nextCustomer = await addCustomerNote(selectedCustomer.id, {
           body: noteDraft.trim(),
@@ -188,7 +179,6 @@ export function CustomersWorkspace() {
       }
 
       setSelectedCustomer(nextCustomer);
-      setDrawerTags(nextCustomer.tags);
       setNoteDraft("");
       setToastTone("success");
       setToastMessage(t("updated"));
@@ -232,12 +222,119 @@ export function CustomersWorkspace() {
     setPage(1);
   };
 
-  const toggleDrawerTag = (tag: string) => {
-    setDrawerTags((current) =>
-      current.includes(tag)
-        ? current.filter((value) => value !== tag)
-        : [...current, tag],
+  const handleToggleCustomerSelection = (customerId: string) => {
+    setSelectedCustomerIds((current) =>
+      current.includes(customerId)
+        ? current.filter((id) => id !== customerId)
+        : [...current, customerId],
     );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedCustomerIds.length === customers.length) {
+      setSelectedCustomerIds([]);
+    } else {
+      setSelectedCustomerIds(customers.map((c) => c.id));
+    }
+  };
+
+  const handleBulkAssignTag = async (tagId: string) => {
+    if (selectedCustomerIds.length === 0) return;
+    setIsSaving(true);
+    try {
+      await fetch('/api/customers/tags/bulk-assign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerIds: selectedCustomerIds, tagIds: [tagId] }),
+      });
+      setToastTone("success");
+      setToastMessage(t("updated"));
+      // Refresh list
+      setSearchTerm(searchTerm);
+    } catch (err) {
+      const e = err as { message?: string };
+      setToastTone("error");
+      setToastMessage(e.message || "Failed to assign tag");
+    } finally {
+      setIsSaving(false);
+      setSelectedCustomerIds([]);
+    }
+  };
+
+  const handleBulkRemoveTag = async (tagId: string) => {
+    if (selectedCustomerIds.length === 0) return;
+    setIsSaving(true);
+    try {
+      await fetch('/api/customers/tags/bulk-remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerIds: selectedCustomerIds, tagIds: [tagId] }),
+      });
+      setToastTone("success");
+      setToastMessage(t("updated"));
+      // Refresh list
+      setSearchTerm(searchTerm);
+    } catch (err) {
+      const e = err as { message?: string };
+      setToastTone("error");
+      setToastMessage(e.message || "Failed to remove tag");
+    } finally {
+      setIsSaving(false);
+      setSelectedCustomerIds([]);
+    }
+  };
+
+  const handleBulkCreateTag = async (name: string) => {
+    if (selectedCustomerIds.length === 0) return;
+    setIsSaving(true);
+    try {
+      const tag = await createTag({ name, target: "CUSTOMER" });
+      await handleBulkAssignTag(tag.id);
+    } catch (err) {
+      const e = err as { message?: string };
+      setToastTone("error");
+      setToastMessage(e.message || "Failed to create and assign tag");
+      setIsSaving(false);
+    }
+  };
+
+  const handleAssignDrawerTag = async (tagId: string) => {
+    if (!selectedCustomer) return;
+    try {
+      await fetch(`/api/customers/${selectedCustomer.id}/tags/${tagId}`, { method: "POST" });
+      const newTag = filters.tags.find(t => t.id === tagId);
+      if (newTag) {
+        setSelectedCustomer({ ...selectedCustomer, tags: [...selectedCustomer.tags, newTag] });
+        setCustomers(customers.map(c => c.id === selectedCustomer.id ? { ...c, tags: [...c.tags, newTag] } : c));
+      }
+    } catch {
+      setToastTone("error");
+      setToastMessage("Failed to assign tag");
+    }
+  };
+
+  const handleRemoveDrawerTag = async (tagId: string) => {
+    if (!selectedCustomer) return;
+    try {
+      await fetch(`/api/customers/${selectedCustomer.id}/tags/${tagId}`, { method: "DELETE" });
+      setSelectedCustomer({ ...selectedCustomer, tags: selectedCustomer.tags.filter(t => t.id !== tagId) });
+      setCustomers(customers.map(c => c.id === selectedCustomer.id ? { ...c, tags: c.tags.filter(t => t.id !== tagId) } : c));
+    } catch {
+      setToastTone("error");
+      setToastMessage("Failed to remove tag");
+    }
+  };
+
+  const handleCreateDrawerTag = async (name: string) => {
+    if (!selectedCustomer) return;
+    try {
+      const tag = await createTag({ name, target: "CUSTOMER" });
+      await handleAssignDrawerTag(tag.id);
+    } catch (err) {
+      const e = err as { message?: string };
+      setToastTone("error");
+      setToastMessage(e.message || "Failed to create tag");
+    }
   };
 
   return (
@@ -302,7 +399,7 @@ export function CustomersWorkspace() {
                   setTagFilter(value === "all" ? "" : value);
                   setPage(1);
                 }}
-                options={filters.tags.map((tag) => ({ label: tag, value: tag }))}
+                options={filters.tags.map((tag) => ({ label: tag.name, value: tag.name }))}
               />
               <FilterSelect
                 label={t("agent")}
@@ -359,10 +456,36 @@ export function CustomersWorkspace() {
               </div>
             ) : (
               <div className="space-y-4 p-4 sm:p-5">
+                {selectedCustomerIds.length > 0 && (
+                  <div className="flex items-center gap-3 rounded-2xl bg-cyan-50 px-4 py-3 border border-cyan-100 dark:bg-cyan-900/20 dark:border-cyan-800/30">
+                    <span className="text-sm font-semibold text-cyan-800 dark:text-cyan-200">
+                      {selectedCustomerIds.length} selected
+                    </span>
+                    <div className="h-4 w-px bg-cyan-200 dark:bg-cyan-800" />
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-cyan-700 dark:text-cyan-300 mr-2">Tags:</span>
+                      <TagPicker
+                        target="CUSTOMER"
+                        selectedTagIds={[]} // In bulk mode, we don't show pre-selected tags since they vary by customer
+                        onAssign={handleBulkAssignTag}
+                        onRemove={handleBulkRemoveTag}
+                        onCreateInline={handleBulkCreateTag}
+                      />
+                    </div>
+                  </div>
+                )}
                 <div data-testid="customer-list" className="hidden overflow-hidden rounded-[1.5rem] border border-slate-200 dark:border-slate-800 lg:block">
                   <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
                     <thead className="bg-slate-50 dark:bg-slate-900">
                       <tr className="text-left text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                        <th className="px-4 py-3 font-semibold w-10">
+                          <input
+                            type="checkbox"
+                            checked={customers.length > 0 && selectedCustomerIds.length === customers.length}
+                            onChange={handleSelectAll}
+                            className="rounded border-slate-300 text-slate-900 focus:ring-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:checked:bg-cyan-500"
+                          />
+                        </th>
                         <th className="px-4 py-3 font-semibold">{t("title")}</th>
                         <th className="px-4 py-3 font-semibold">{t("channels")}</th>
                         <th className="px-4 py-3 font-semibold">{t("agent")}</th>
@@ -372,7 +495,15 @@ export function CustomersWorkspace() {
                     </thead>
                     <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950">
                       {customers.map((customer) => (
-                        <tr key={customer.id}>
+                        <tr key={customer.id} className={selectedCustomerIds.includes(customer.id) ? "bg-slate-50 dark:bg-slate-900/50" : ""}>
+                          <td className="px-4 py-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedCustomerIds.includes(customer.id)}
+                              onChange={() => handleToggleCustomerSelection(customer.id)}
+                              className="rounded border-slate-300 text-slate-900 focus:ring-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:checked:bg-cyan-500"
+                            />
+                          </td>
                           <td className="px-4 py-3">
                             <button
                               type="button"
@@ -404,14 +535,14 @@ export function CustomersWorkspace() {
                                   {customer.email || customer.phone}
                                 </p>
                                 <div className="flex flex-wrap gap-2">
-                                  {customer.tags.map((tag) => (
-                                    <span
-                                      key={tag}
-                                      className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-                                    >
-                                      {tag}
-                                    </span>
-                                  ))}
+                                    {customer.tags.map((tag) => (
+                                      <span
+                                        key={tag.id}
+                                        className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                                      >
+                                        {tag.name}
+                                      </span>
+                                    ))}
                                 </div>
                               </div>
                             </button>
@@ -504,10 +635,10 @@ export function CustomersWorkspace() {
                           <div className="flex flex-wrap gap-2">
                             {customer.tags.map((tag) => (
                               <span
-                                key={tag}
+                                key={tag.id}
                                 className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
                               >
-                                {tag}
+                                {tag.name}
                               </span>
                             ))}
                           </div>
@@ -539,7 +670,6 @@ export function CustomersWorkspace() {
       </main>
 
       <CustomerDrawer
-        availableTags={filters.tags}
         customer={selectedCustomer}
         isOpen={Boolean(selectedCustomerId)}
         isSaving={isSaving}
@@ -553,7 +683,9 @@ export function CustomersWorkspace() {
         onNoteDraftChange={setNoteDraft}
         onOpenConversation={handleOpenConversation}
         onSave={() => void handleSaveCustomer()}
-        onToggleTag={toggleDrawerTag}
+        onAssignTag={handleAssignDrawerTag}
+        onRemoveTag={handleRemoveDrawerTag}
+        onCreateTag={handleCreateDrawerTag}
       />
 
       {selectedCustomerId && isDrawerLoading ? (
