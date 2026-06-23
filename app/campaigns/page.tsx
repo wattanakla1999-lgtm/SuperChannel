@@ -1,39 +1,20 @@
-"use client";
-
-import { useState } from "react";
-import { useTranslations } from "next-intl";
+import { Metadata } from "next";
+import { CampaignList } from "@/features/campaigns/components/campaign-list";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
-import { SegmentEditor } from "./segment-editor";
-import { SegmentList } from "./segment-list";
+import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 
-export function SegmentsWorkspace() {
-  const t = useTranslations("segments");
-  const [isEditorOpen, setIsEditorOpen] = useState(false);
-  const [editingSegmentId, setEditingSegmentId] = useState<string | null>(null);
+export const metadata: Metadata = {
+  title: "Message Campaigns | SuperChannel",
+};
 
-  const handleCreateNew = () => {
-    setEditingSegmentId(null);
-    setIsEditorOpen(true);
-  };
-
-  const handleEdit = (id: string) => {
-    setEditingSegmentId(id);
-    setIsEditorOpen(true);
-  };
-
-  if (isEditorOpen) {
-    return (
-      <SegmentEditor
-        segmentId={editingSegmentId}
-        onBack={() => setIsEditorOpen(false)}
-      />
-    );
-  }
+export default async function CampaignsPage() {
+  const t = await getTranslations("campaigns");
 
   return (
     <main
-      data-testid="segments-page"
+      data-testid="campaigns-page"
       className="flex h-full min-h-[calc(100vh-97px)] flex-col px-4 py-4 lg:px-6 lg:py-6"
     >
       <div className="space-y-4">
@@ -44,20 +25,22 @@ export function SegmentsWorkspace() {
                 {t("title")}
               </h2>
               <p className="max-w-2xl text-sm text-slate-600 dark:text-slate-400">
-                {t("description")}
+                {t("subtitle")}
               </p>
             </div>
             <div className="shrink-0">
-              <Button onClick={handleCreateNew}>
-                <Plus className="mr-2 h-4 w-4" />
-                {t("createSegment")}
-              </Button>
+              <Link href="/campaigns/new">
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t("createCampaign")}
+                </Button>
+              </Link>
             </div>
           </div>
         </section>
 
         <section className="min-h-[24rem] rounded-[1.75rem] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
-          <SegmentList onEdit={handleEdit} />
+          <CampaignList />
         </section>
       </div>
     </main>

@@ -9,9 +9,9 @@ import Link from "next/link";
 import type { ReactNode, SVGProps } from "react";
 import { useState, useSyncExternalStore } from "react";
 import { logout } from "../services/inbox-service";
-import { Users, UserRound, PieChart, ChevronDown, ChevronRight } from "lucide-react";
+import { Users, UserRound, PieChart, ChevronDown, ChevronRight, Megaphone, Send } from "lucide-react";
 
-type NavigationKey = "dashboard" | "customers" | "segments" | "inbox" | "publishing" | "integrations" | "team" | "settings";
+type NavigationKey = "dashboard" | "customers" | "segments" | "inbox" | "marketing" | "publishing" | "campaigns" | "integrations" | "team" | "settings";
 
 type NavigationItem = {
   href: string;
@@ -70,14 +70,26 @@ const navigationItems: NavigationItem[] = [
   },
   {
     href: "/publishing",
-    key: "publishing",
-    icon: (props: SVGProps<SVGSVGElement>) => (
-      <SidebarIcon {...props}>
-        <path d="M4.5 14.5 15.5 5.5" />
-        <path d="m8 5 7 1-1 7" />
-        <path d="M5 15h3" />
-      </SidebarIcon>
-    ),
+    key: "marketing",
+    icon: Megaphone,
+    children: [
+      {
+        href: "/publishing",
+        key: "publishing",
+        icon: (props: SVGProps<SVGSVGElement>) => (
+          <SidebarIcon {...props}>
+            <path d="M4.5 14.5 15.5 5.5" />
+            <path d="m8 5 7 1-1 7" />
+            <path d="M5 15h3" />
+          </SidebarIcon>
+        ),
+      },
+      {
+        href: "/campaigns",
+        key: "campaigns",
+        icon: Send,
+      },
+    ],
   },
   {
     href: "/integrations",

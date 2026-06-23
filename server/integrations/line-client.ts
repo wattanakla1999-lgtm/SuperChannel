@@ -189,6 +189,47 @@ export async function pushLineImageMessage(
   };
 }
 
+export async function pushLineMulticastMessage(
+  userIds: string[],
+  messages: Record<string, unknown>[],
+  retryKey?: string,
+): Promise<LinePushResult> {
+  const { apiBaseUrl, channelAccessToken } = getLineConfig();
+
+  if (hasLineMockBaseUrl(apiBaseUrl)) {
+    return {
+      requestId: `mock-line-request-${Date.now()}`,
+    };
+  }
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${channelAccessToken}`,
+    "Content-Type": "application/json",
+  };
+
+  if (retryKey) {
+    headers["X-Line-Retry-Key"] = retryKey;
+  }
+
+  const response = await fetch(
+    `${apiBaseUrl.replace(/\/$/, "")}/v2/bot/message/multicast`,
+    {
+      body: JSON.stringify({
+        messages,
+        to: userIds,
+      }),
+      headers,
+      method: "POST",
+    },
+  );
+
+  await parseLineResponse(response);
+
+  return {
+    requestId: response.headers.get("x-line-request-id"),
+  };
+}
+
 export async function fetchLineMessageContent(messageId: string): Promise<LineContentResult> {
   const { apiBaseUrl, channelAccessToken } = getLineConfig();
   const contentBaseUrl = getLineContentBaseUrl(apiBaseUrl);

@@ -57,7 +57,9 @@
     "operatorWorkspace": "Operator workspace",
     "collapse": "Collapse left menu",
     "expand": "Expand left menu",
-    "welcome": "Welcome, {name}"
+    "welcome": "Welcome, {name}",
+    "marketing": "Marketing",
+    "campaigns": "Campaigns"
   },
   "login": {
     "tagline": "Unified conversations and publishing",
@@ -249,7 +251,13 @@
     "search": "Search posts",
     "channel": "Channel",
     "allChannels": "All channels",
-    "tabs": {"all":"All","draft":"Drafts","scheduled":"Scheduled","published":"Published","failed":"Failed"},
+    "tabs": {
+      "all": "All",
+      "draft": "Drafts",
+      "scheduled": "Scheduled",
+      "published": "Published",
+      "failed": "Failed"
+    },
     "loading": "Loading posts...",
     "emptyTitle": "No posts yet",
     "empty": "Create a post to start your publishing queue.",
@@ -274,7 +282,12 @@
     "channelRequired": "Select at least one channel",
     "futureRequired": "Choose a future date and time",
     "created": "Post created successfully.",
-    "statuses": {"draft":"draft","scheduled":"scheduled","published":"published","failed":"failed"}
+    "statuses": {
+      "draft": "draft",
+      "scheduled": "scheduled",
+      "published": "published",
+      "failed": "failed"
+    }
   },
   "integrations": {
     "eyebrow": "Channel infrastructure",
@@ -367,14 +380,32 @@
     "invalidEmail": "Enter a valid email and team before inviting.",
     "invited": "Invitation created",
     "updated": "Member saved",
-    "roles": {"Owner":"Owner","Admin":"Admin","Supervisor":"Supervisor","Agent":"Agent"},
-    "statuses": {"active":"Active","inactive":"Inactive","online":"Online","offline":"Offline"}
+    "roles": {
+      "Owner": "Owner",
+      "Admin": "Admin",
+      "Supervisor": "Supervisor",
+      "Agent": "Agent"
+    },
+    "statuses": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "online": "Online",
+      "offline": "Offline"
+    }
   },
   "settings": {
     "eyebrow": "Workspace controls",
     "title": "Settings",
     "description": "Configure workspace defaults, saved replies, and notifications.",
-    "sections": {"workspace":"Workspace Profile","hours":"Business Hours","inbox":"Inbox Preferences","tags":"Tags","replies":"Saved Replies","notifications":"Notifications","security":"Security"},
+    "sections": {
+      "workspace": "Workspace Profile",
+      "hours": "Business Hours",
+      "inbox": "Inbox Preferences",
+      "tags": "Tags",
+      "replies": "Saved Replies",
+      "notifications": "Notifications",
+      "security": "Security"
+    },
     "businessName": "Business name",
     "workspaceEmail": "Workspace email",
     "phone": "Phone",
@@ -462,6 +493,9 @@
     "errorArchivingSegment": "Failed to archive segment.",
     "emptyStateTitle": "No segments found",
     "emptyStateDesc": "Create your first segment to start grouping customers.",
+    "searchPlaceholder": "Search segments...",
+    "noResultsTitle": "No segments match your search",
+    "noResultsDesc": "Try a different keyword or clear the search.",
     "name": "Name",
     "segmentDescription": "Description",
     "lastCalculated": "Last calculated",
@@ -549,5 +583,53 @@
     "consentOptedIn": "Opted in",
     "consentOptedOut": "Opted out",
     "consentUnknown": "Unknown"
+  },
+  "campaigns": {
+    "title": "Message Campaigns",
+    "subtitle": "Create and manage your targeted message campaigns.",
+    "createCampaign": "Create Campaign",
+    "errorLoadingCampaigns": "Failed to load campaigns",
+    "errorCancellingCampaign": "Failed to cancel campaign",
+    "emptyStateTitle": "No campaigns found",
+    "emptyStateDesc": "You haven't created any campaigns yet.",
+    "searchPlaceholder": "Search campaigns...",
+    "noResultsTitle": "No campaigns match your search",
+    "noResultsDesc": "Try a different keyword or clear the search.",
+    "name": "Name",
+    "channel": "Channel",
+    "targetType": "Target",
+    "reach": "Reach",
+    "status": "Status",
+    "scheduledAt": "Scheduled At",
+    "actions": "Actions",
+    "broadcast": "Broadcast",
+    "broadcastDesc": "Send to all eligible LINE followers.",
+    "targeted": "Targeted",
+    "targetedDesc": "Send to a specific customer segment.",
+    "status_DRAFT": "Draft",
+    "status_SCHEDULED": "Scheduled",
+    "status_SENDING": "Sending",
+    "status_COMPLETED": "Completed",
+    "status_PARTIAL_FAILED": "Partial Failed",
+    "status_FAILED": "Failed",
+    "status_CANCELLED": "Cancelled",
+    "cancelCampaignTitle": "Cancel Campaign",
+    "cancelCampaignDesc": "Are you sure you want to cancel this scheduled campaign?",
+    "close": "Close",
+    "confirmCancel": "Confirm Cancel",
+    "stepSetup": "Setup",
+    "stepAudience": "Audience",
+    "stepMessage": "Message",
+    "stepTest": "Test",
+    "stepSchedule": "Schedule",
+    "campaignName": "Campaign Name",
+    "description": "Description",
+    "testUserId": "Test LINE User ID",
+    "sendTest": "Send Test Message",
+    "prev": "Previous",
+    "next": "Next",
+    "schedule": "Save & Schedule",
+    "segment": "Customer Segment",
+    "segmentHelp": "Only customers matching this segment will receive the campaign."
   }
 }
