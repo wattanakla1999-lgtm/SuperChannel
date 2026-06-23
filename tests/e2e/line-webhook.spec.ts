@@ -1,5 +1,5 @@
-import { createHmac } from "node:crypto";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { createHmac } from "node:crypto";
 
 const lineSecret = process.env.LINE_CHANNEL_SECRET ?? "test-line-secret";
 
@@ -66,7 +66,7 @@ test.describe("line webhook", () => {
           replyToken: `reply-${uniqueToken}`,
           source: {
             type: "user",
-            userId: "line-99124",
+            userId: "U1234567890abcdef1234567890nina12",
           },
           timestamp: Date.now(),
           type: "message",
@@ -103,7 +103,7 @@ test.describe("line webhook", () => {
           mode: "active",
           source: {
             type: "user",
-            userId: "line-99124",
+            userId: "U1234567890abcdef1234567890nina12",
           },
           timestamp: Date.now() + 1000,
           type: "message",
@@ -131,7 +131,7 @@ test.describe("line webhook", () => {
           mode: "active",
           source: {
             type: "user",
-            userId: "line-99124",
+            userId: "U1234567890abcdef1234567890nina12",
           },
           timestamp: Date.now() + 1500,
           type: "message",
@@ -161,7 +161,7 @@ test.describe("line webhook", () => {
           mode: "active",
           source: {
             type: "user",
-            userId: "line-99124",
+            userId: "U1234567890abcdef1234567890nina12",
           },
           timestamp: Date.now() + 2000,
           type: "message",

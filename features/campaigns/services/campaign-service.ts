@@ -1,10 +1,10 @@
 import "server-only";
 
+import { SegmentCondition } from "@/features/segments/schemas/segment-conditions.schema";
+import { buildSegmentRawQuery } from "@/features/segments/services/segment-evaluator";
+import { AuthenticatedSession } from "@/server/auth/session";
 import { prisma } from "@/server/database/prisma";
 import { Prisma } from "@prisma/client";
-import { buildSegmentRawQuery } from "@/features/segments/services/segment-evaluator";
-import { SegmentCondition } from "@/features/segments/schemas/segment-conditions.schema";
-import { AuthenticatedSession } from "@/server/auth/session";
 
 export async function calculateCampaignAudience(
   organizationId: string,
@@ -43,10 +43,10 @@ export async function calculateCampaignAudience(
       SELECT 
         c.id,
         EXISTS (
-          SELECT 1 FROM customer_channel_identities i 
-          WHERE i.customer_id = c.id AND i.channel = 'LINE'
-        ) as has_line,
-        c.marketing_consent_status = 'OPTED_IN' as has_consent
+            SELECT 1 FROM customer_channel_identities i 
+            WHERE i.customer_id = c.id AND i.channel = 'line'
+          ) as has_line,
+          c.marketing_consent_status = 'opted_in' as has_consent
       FROM customers c
       INNER JOIN audience a ON c.id = a.id
       WHERE c.organization_id = ${organizationId}::uuid
@@ -137,6 +137,89 @@ export async function cancelCampaign(session: AuthenticatedSession, campaignId: 
       actorMemberId: session.accountId,
       action: "CANCEL",
     },
+  });
+
+  return { success: true };
+}
+
+export async function resendCampaign(session: AuthenticatedSession, campaignId: string) {
+  const existingCampaign = await prisma.campaign.findUnique({
+    where: { id: campaignId, organizationId: session.organizationId },
+    include: { messages: true },
+  });
+
+  if (!existingCampaign) {
+    throw new Error("Campaign not found");
+  }
+
+  const newCampaign = await prisma.$transaction(async (tx) => {
+    const created = await tx.campaign.create({
+      data: {
+        organizationId: session.organizationId,
+        name: `${existingCampaign.name} (Resend)`,
+        description: existingCampaign.description,
+        channel: existingCampaign.channel,
+        targetType: existingCampaign.targetType,
+        segmentId: existingCampaign.segmentId,
+        scheduledAt: null,
+        status: "SCHEDULED",
+        createdByMemberId: session.accountId,
+      },
+    });
+
+    if (existingCampaign.messages.length > 0) {
+      await tx.campaignMessage.createMany({
+        data: existingCampaign.messages.map((msg) => ({
+          campaignId: created.id,
+          organizationId: session.organizationId,
+          type: msg.type,
+          textContent: msg.textContent,
+          imageUrl: msg.imageUrl,
+          previewImageUrl: msg.previewImageUrl,
+          orderIndex: msg.orderIndex,
+        })),
+      });
+    }
+
+    await tx.campaignAuditLog.create({
+      data: {
+        campaignId: created.id,
+        organizationId: session.organizationId,
+        actorMemberId: session.accountId,
+        action: "CREATE",
+      },
+    });
+
+    return created;
+  });
+
+  return newCampaign;
+}
+
+export async function deleteCampaign(session: AuthenticatedSession, campaignId: string) {
+  const campaign = await prisma.campaign.findUnique({
+    where: { id: campaignId, organizationId: session.organizationId },
+  });
+
+  if (!campaign) {
+    throw new Error("Campaign not found");
+  }
+
+  if (campaign.status === "SENDING") {
+    throw new Error("Cannot delete a campaign while it is sending.");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.campaignAuditLog.create({
+      data: {
+        campaignId,
+        organizationId: session.organizationId,
+        actorMemberId: session.accountId,
+        action: "DELETE",
+      },
+    });
+
+    await tx.campaign.delete({ where: { id: campaignId } });
   });
 
   return { success: true };

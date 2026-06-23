@@ -1,15 +1,27 @@
 "use client";
 
-import { useTranslations } from "next-intl";
-import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Modal } from "@/components/ui/modal";
 import { classNames } from "@/lib/class-names";
 import {
-  Megaphone, Users, MessageSquare, Send, Calendar,
-  Trash2, CheckCircle, AlertCircle, Loader2, ChevronDown, Search,
+  AlertCircle,
+  Calendar,
+  CheckCircle,
+  ChevronDown,
+  Loader2,
+  Image as LucideImage,
+  Upload as LucideUpload,
+  Megaphone,
+  MessageSquare,
+  Search,
+  Send,
+  Trash2,
+  Users
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -124,8 +136,150 @@ function SearchableSelect<T>({
   );
 }
 
+// ─── Image Upload Input ──────────────────────────────────────────────────────
+function ImageUploadInput({
+  value,
+  onChange,
+  onPreviewChange,
+}: {
+  value: string;
+  onChange: (url: string) => void;
+  onPreviewChange?: (url: string) => void;
+}) {
+  const [isUploading, setIsUploading] = useState(false);
+  const [isViewerOpen, setIsViewerOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUpload = async (file: File) => {
+    setIsUploading(true);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/campaigns/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "อัปโหลดภาพไม่สำเร็จ");
+      }
+
+      const { url } = await res.json();
+      onChange(url);
+      if (onPreviewChange) {
+        onPreviewChange(url);
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3 rounded-lg border border-dashed border-slate-300 p-4 dark:border-slate-700 bg-white/50 dark:bg-slate-950/20">
+      <div className="flex items-center gap-4">
+        {value ? (
+          <button
+            type="button"
+            onClick={() => setIsViewerOpen(true)}
+            title="คลิกเพื่อดูรูปขนาดจริง"
+            className="group relative h-20 w-20 shrink-0 overflow-hidden rounded-md border border-slate-200 transition hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={value} alt="Preview" className="h-full w-full object-cover transition group-hover:scale-105" />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition group-hover:opacity-100">
+              <span className="text-[10px] font-medium text-white">คลิกลิเพื่อดูภาพ</span>
+            </div>
+          </button>
+        ) : (
+          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900 text-slate-400">
+            <LucideImage className="h-8 w-8" />
+          </div>
+        )}
+
+        <div className="flex-1 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isUploading}
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-1.5 py-1 px-3 text-xs"
+            >
+              {isUploading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <LucideUpload className="h-4 w-4" />
+              )}
+              {isUploading ? "กำลังอัปโหลด..." : "อัปโหลดรูปภาพ"}
+            </Button>
+            {value && (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  onChange("");
+                  if (onPreviewChange) onPreviewChange("");
+                }}
+                className="text-xs text-red-500 hover:text-red-600 transition-colors bg-transparent border-0"
+              >
+                ลบรูปภาพ
+              </Button>
+            )}
+          </div>
+          <p className="text-xs text-slate-500">รองรับ JPG, PNG หรือ WebP ขนาดไม่เกิน 5MB</p>
+        </div>
+      </div>
+
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleUpload(file);
+        }}
+        accept="image/*"
+        className="hidden"
+      />
+
+      <div className="space-y-1">
+        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">หรือป้อน URL รูปภาพโดยตรง</label>
+        <Input
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value);
+            if (onPreviewChange) onPreviewChange(e.target.value);
+          }}
+          placeholder="https://example.com/image.jpg"
+          className="text-xs"
+        />
+      </div>
+
+      {error && <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><AlertCircle className="h-3.5 w-3.5" /> {error}</p>}
+
+      {isViewerOpen && (
+        <Modal isOpen={isViewerOpen} onClose={() => setIsViewerOpen(false)} title="ดูรูปภาพขนาดจริง">
+          <div className="flex justify-center items-center p-2 bg-slate-50 dark:bg-slate-900 rounded-lg overflow-hidden max-h-[70vh]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={value} alt="Full view" className="max-w-full max-h-[60vh] object-contain rounded-lg shadow-sm" />
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
 // ─── Campaign Builder ─────────────────────────────────────────────────────────
-export function CampaignBuilder() {
+interface CampaignBuilderProps {
+  campaignId?: string;
+}
+
+export function CampaignBuilder({ campaignId }: CampaignBuilderProps) {
   const t = useTranslations("campaigns");
   const router = useRouter();
   const [step, setStep] = useState<Step>(1);
@@ -153,6 +307,7 @@ export function CampaignBuilder() {
   const [lineCustomerSearch, setLineCustomerSearch] = useState("");
 
   // Schedule
+  const [isImmediate, setIsImmediate] = useState(true);
   const [scheduledAt, setScheduledAt] = useState("");
 
   // Action states
@@ -160,6 +315,56 @@ export function CampaignBuilder() {
   const [isSaving, setIsSaving] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [isInitialLoading, setIsInitialLoading] = useState(!!campaignId);
+
+  // If edit mode: fetch existing campaign on mount
+  useEffect(() => {
+    if (!campaignId) return;
+
+    const getCampaign = async () => {
+      try {
+        const res = await fetch(`/api/campaigns/${campaignId}`);
+        if (!res.ok) throw new Error("ไม่สามารถดึงข้อมูลแคมเปญได้");
+        const data = await res.json();
+
+        setName(data.name || "");
+        setDescription(data.description || "");
+        setTargetType(data.targetType || "BROADCAST");
+        setSegmentId(data.segmentId || "");
+        if (data.segment) {
+          setSegmentName(data.segment.name || "");
+        }
+
+        if (data.messages && data.messages.length > 0) {
+          setMessages(
+            data.messages.map((m: { type: "TEXT" | "IMAGE"; textContent?: string; imageUrl?: string; previewImageUrl?: string }) => ({
+              type: m.type,
+              textContent: m.textContent || "",
+              imageUrl: m.imageUrl || "",
+              previewImageUrl: m.previewImageUrl || "",
+            }))
+          );
+        }
+
+        if (data.scheduledAt) {
+          setIsImmediate(false);
+          const dt = new Date(data.scheduledAt);
+          // format local datetime-local value (YYYY-MM-DDTHH:MM)
+          const timezoneOffset = dt.getTimezoneOffset() * 60000;
+          const localOffsetValue = new Date(dt.getTime() - timezoneOffset);
+          setScheduledAt(localOffsetValue.toISOString().slice(0, 16));
+        } else {
+          setIsImmediate(true);
+        }
+      } catch (err: unknown) {
+        setSaveError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setIsInitialLoading(false);
+      }
+    };
+
+    getCampaign();
+  }, [campaignId]);
 
   const steps = [
     { id: 1, title: t("stepSetup"), icon: Megaphone },
@@ -214,9 +419,11 @@ export function CampaignBuilder() {
   };
 
   const updateMessage = (index: number, updates: Partial<MessageBlock>) => {
-    const newMsgs = [...messages];
-    newMsgs[index] = { ...newMsgs[index], ...updates };
-    setMessages(newMsgs);
+    setMessages((prevMessages) => {
+      const newMsgs = [...prevMessages];
+      newMsgs[index] = { ...newMsgs[index], ...updates };
+      return newMsgs;
+    });
   };
 
   const handleSendTest = async () => {
@@ -244,17 +451,20 @@ export function CampaignBuilder() {
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = async (forceAsDraft: boolean = false) => {
     if (!name.trim()) { setSaveError("กรุณาใส่ชื่อแคมเปญ (ขั้นตอนที่ 1)"); return; }
     if (messages.length === 0) { setSaveError("กรุณาเพิ่มข้อความอย่างน้อย 1 ชิ้น (ขั้นตอนที่ 3)"); return; }
-    if (!scheduledAt) { setSaveError("กรุณาเลือกวันและเวลาส่ง"); return; }
+    if (!forceAsDraft && !isImmediate && !scheduledAt) { setSaveError("กรุณาเลือกวันและเวลาส่ง"); return; }
     if (targetType === "TARGETED" && !segmentId) { setSaveError("กรุณาเลือกกลุ่มเป้าหมาย (ขั้นตอนที่ 2)"); return; }
 
     setIsSaving(true);
     setSaveError(null);
     try {
-      const res = await fetch("/api/campaigns", {
-        method: "POST",
+      const endpoint = campaignId ? `/api/campaigns/${campaignId}` : "/api/campaigns";
+      const method = campaignId ? "PUT" : "POST";
+
+      const res = await fetch(endpoint, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
@@ -262,7 +472,8 @@ export function CampaignBuilder() {
           channel: "LINE",
           targetType,
           segmentId: targetType === "TARGETED" ? segmentId : null,
-          scheduledAt: new Date(scheduledAt).toISOString(),
+          scheduledAt: forceAsDraft || isImmediate ? null : new Date(scheduledAt).toISOString(),
+          isDraft: forceAsDraft,
           messages,
         }),
       });
@@ -271,6 +482,7 @@ export function CampaignBuilder() {
         throw new Error(data.error ?? "บันทึกแคมเปญไม่สำเร็จ");
       }
       router.push("/campaigns");
+      router.refresh();
     } catch (err: unknown) {
       setSaveError((err as Error).message);
     } finally {
@@ -278,15 +490,27 @@ export function CampaignBuilder() {
     }
   };
 
+  if (isInitialLoading) {
+    return (
+      <div className="flex h-64 flex-col items-center justify-center rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+        <Loader2 className="h-8 w-8 animate-spin text-cyan-600" />
+        <p className="mt-2 text-sm text-slate-500">กำลังโหลดคำขอแคมเปญ...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
       {/* Step Header */}
       <div className="border-b border-slate-200 px-6 py-5 dark:border-slate-800">
         <nav aria-label="Progress">
-          <ol role="list" className="flex items-center gap-1 sm:gap-3">
+          <ol role="list" className="flex items-center justify-between w-full">
             {steps.map((s, idx) => (
-              <li key={s.id} className="flex items-center gap-1 sm:gap-3">
-                <div className="flex flex-col items-center gap-1">
+              <li key={s.id} className={classNames(
+                "flex items-center",
+                idx < steps.length - 1 ? "flex-1" : ""
+              )}>
+                <div className="flex flex-col items-center gap-1 shrink-0">
                   <div className={classNames(
                     "flex h-9 w-9 items-center justify-center rounded-full border-2 transition-colors",
                     step > s.id ? "border-cyan-600 bg-cyan-600 text-white" :
@@ -296,13 +520,13 @@ export function CampaignBuilder() {
                     <s.icon className="h-4 w-4" />
                   </div>
                   <span className={classNames(
-                    "hidden sm:block text-xs font-medium",
+                    "hidden sm:block text-xs font-medium whitespace-nowrap",
                     step === s.id ? "text-cyan-600 dark:text-cyan-400" : "text-slate-400"
                   )}>{s.title}</span>
                 </div>
                 {idx < steps.length - 1 && (
                   <div className={classNames(
-                    "h-0.5 w-6 sm:w-14 shrink-0 mb-5 transition-colors",
+                    "h-0.5 w-full flex-1 mx-2 sm:mx-4 shrink-1 mb-5 transition-colors",
                     step > s.id ? "bg-cyan-500" : "bg-slate-200 dark:bg-slate-700"
                   )} />
                 )}
@@ -424,8 +648,11 @@ export function CampaignBuilder() {
                       />
                     ) : (
                       <div className="space-y-2">
-                        <Input value={msg.imageUrl} onChange={(e) => updateMessage(idx, { imageUrl: e.target.value })} placeholder="Image URL (https://...)" />
-                        <Input value={msg.previewImageUrl} onChange={(e) => updateMessage(idx, { previewImageUrl: e.target.value })} placeholder="Preview URL (https://...)" />
+                        <ImageUploadInput
+                          value={msg.imageUrl || ""}
+                          onChange={(url) => updateMessage(idx, { imageUrl: url })}
+                          onPreviewChange={(url) => updateMessage(idx, { previewImageUrl: url })}
+                        />
                       </div>
                     )}
                   </div>
@@ -501,11 +728,34 @@ export function CampaignBuilder() {
                 <div className="flex justify-between"><span className="text-slate-500">ข้อความ</span><span className="font-medium">{messages.length} ชิ้น</span></div>
               </div>
             </div>
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                {t("scheduledAt")} <span className="text-red-500">*</span>
+            <div className="space-y-4 pt-2">
+              <label className="flex items-center gap-3">
+                <input
+                  type="radio"
+                  name="scheduleType"
+                  className="h-4 w-4 border-slate-300 text-cyan-600 focus:ring-cyan-600 dark:border-slate-600 dark:bg-slate-700"
+                  checked={isImmediate}
+                  onChange={() => { setIsImmediate(true); setSaveError(null); }}
+                />
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">สร้างและส่งทันที</span>
               </label>
-              <Input type="datetime-local" value={scheduledAt} onChange={(e) => { setScheduledAt(e.target.value); setSaveError(null); }} />
+              
+              <label className="flex items-center gap-3">
+                <input
+                  type="radio"
+                  name="scheduleType"
+                  className="h-4 w-4 border-slate-300 text-cyan-600 focus:ring-cyan-600 dark:border-slate-600 dark:bg-slate-700"
+                  checked={!isImmediate}
+                  onChange={() => { setIsImmediate(false); setSaveError(null); }}
+                />
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">ตั้งเวลาส่งล่วงหน้า</span>
+              </label>
+
+              {!isImmediate && (
+                <div className="pl-7 space-y-1.5 animate-in fade-in slide-in-from-top-1">
+                  <Input type="datetime-local" value={scheduledAt} onChange={(e) => { setScheduledAt(e.target.value); setSaveError(null); }} />
+                </div>
+              )}
             </div>
             {saveError && (
               <div className="flex items-start gap-2 rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950/20 dark:text-red-300">
@@ -522,9 +772,21 @@ export function CampaignBuilder() {
         {step < 5 ? (
           <Button onClick={handleNext}>{t("next")}</Button>
         ) : (
-          <Button onClick={handleSave} disabled={isSaving} className="bg-cyan-600 hover:bg-cyan-700 text-white">
-            {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />กำลังบันทึก...</> : <><Calendar className="mr-2 h-4 w-4" />{t("schedule")}</>}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => handleSave(true)}
+              disabled={isSaving}
+              className="border-slate-300 dark:border-slate-700"
+            >
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "บันทึกเป็นแบบร่าง (ยังไม่ส่ง)"}
+            </Button>
+            <Button onClick={() => handleSave(false)} disabled={isSaving} className="bg-cyan-600 hover:bg-cyan-700 text-white">
+              {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />กำลังบันทึก...</> : 
+               isImmediate ? <><Send className="mr-2 h-4 w-4" />สร้างและส่งทันที</> :
+               <><Calendar className="mr-2 h-4 w-4" />ตั้งเวลาส่ง</>}
+            </Button>
+          </div>
         )}
       </div>
     </div>

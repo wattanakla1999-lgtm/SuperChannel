@@ -1,26 +1,35 @@
 "use client";
 
-import { useTranslations } from "next-intl";
-import { useState, useEffect, useRef } from "react";
-import { fetchCampaignsAction, cancelCampaignAction } from "../actions/campaign-actions";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Pen, Eye, XCircle, MoreHorizontal, Clock, Search } from "lucide-react";
-import { Modal } from "@/components/ui/modal";
-import { Spinner } from "@/components/ui/spinner";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/input";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { Pagination } from "@/components/ui/pagination";
-import Link from "next/link";
+import { ResultModal } from "@/components/ui/result-modal";
+import { Spinner } from "@/components/ui/spinner";
 import { classNames } from "@/lib/class-names";
+import { Clock, Eye, MoreHorizontal, Pen, Search, Send, XCircle } from "lucide-react";
+import { useTranslations } from "next-intl";
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+import { cancelCampaignAction, fetchCampaignsAction } from "../actions/campaign-actions";
 
 function ActionMenu({
   campaignId,
   status,
   onCancel,
+  onResend,
+  onDelete,
+  isResending,
+  isDeleting,
 }: {
   campaignId: string;
   status: string;
   onCancel: () => void;
+  onResend: () => void;
+  onDelete: () => void;
+  isResending: boolean;
+  isDeleting?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -51,7 +60,7 @@ function ActionMenu({
 
       {open && (
         <div className="absolute right-0 z-50 mt-1 w-44 origin-top-right rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800">
-          {status === "DRAFT" ? (
+          {(status === "DRAFT" || status === "SCHEDULED") ? (
             <Link
               href={`/campaigns/${campaignId}/edit`}
               className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700/60"
@@ -82,6 +91,27 @@ function ActionMenu({
               </button>
             </>
           )}
+
+          <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
+          <button
+            type="button"
+            disabled={isResending}
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/40 disabled:opacity-50"
+            onClick={() => { onResend(); setOpen(false); }}
+          >
+            {isResending ? <Spinner className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
+            ส่งอีกครั้ง
+          </button>
+          <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
+          <button
+            type="button"
+            disabled={isResending || isDeleting}
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40 disabled:opacity-50"
+            onClick={() => { onDelete(); setOpen(false); }}
+          >
+            {isDeleting ? <Spinner className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+            ลบ
+          </button>
         </div>
       )}
     </div>
@@ -97,8 +127,17 @@ export function CampaignList() {
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [cancelCampaignId, setCancelCampaignId] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [deleteCampaignId, setDeleteCampaignId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [resendingId, setResendingId] = useState<string | null>(null);
+  const [resultModal, setResultModal] = useState<{ tone: "success" | "error"; title: string; description?: string } | null>(null);
+
+  const showResult = (tone: "success" | "error", title: string, description?: string) => {
+    setResultModal({ tone, title, description });
+  };
 
   // Debounce search input by 350ms
   useEffect(() => {
@@ -113,7 +152,7 @@ export function CampaignList() {
       setCampaigns(res.items);
       setTotal(res.total);
     } catch {
-      alert(t("errorLoadingCampaigns"));
+      showResult("error", "โหลดข้อมูลไม่สำเร็จ", t("errorLoadingCampaigns"));
     } finally {
       setIsLoading(false);
     }
@@ -129,12 +168,59 @@ export function CampaignList() {
   const handleCancel = async () => {
     if (!cancelCampaignId) return;
     try {
+      setIsCancelling(true);
       await cancelCampaignAction(cancelCampaignId);
       fetchCampaigns(page, debouncedSearch);
+      showResult("success", "สำเร็จ");
     } catch {
-      alert(t("errorCancellingCampaign"));
+      showResult("error", "เกิดข้อผิดพลาด", t("errorCancellingCampaign"));
     } finally {
+      setIsCancelling(false);
       setCancelCampaignId(null);
+    }
+  };
+
+  const handleResend = async (campaignId: string) => {
+    try {
+      setResendingId(campaignId);
+      // Dynamically import to avoid top-level issues, or just call action if it's imported
+      const { resendCampaignAction } = await import("../actions/campaign-actions");
+      const result = await resendCampaignAction(campaignId);
+      fetchCampaigns(page, debouncedSearch);
+      if (result.sent === 0) {
+        const reason = result.skipped > 0
+          ? `ข้าม ${result.skipped} คน (ไม่มีสิทธิ์รับข้อความ)`
+          : "ไม่พบผู้รับที่มีสิทธิ์";
+        showResult("error", "ไม่ได้ส่งข้อความ", reason);
+      } else {
+        const skippedNote = result.skipped > 0 ? ` ข้าม ${result.skipped} คน` : "";
+        const failedNote = result.failed > 0 ? ` ล้มเหลว ${result.failed} คน` : "";
+        showResult("success", "สำเร็จ", `ส่งแล้ว ${result.sent} คน${skippedNote}${failedNote}`.trim());
+      }
+    } catch {
+      showResult("error", "เกิดข้อผิดพลาด", "ไม่สามารถส่งข้อความได้ โปรดลองอีกครั้ง");
+    } finally {
+      setResendingId(null);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteCampaignId) return;
+    const id = deleteCampaignId;
+    try {
+      // close confirmation and show progress
+      setDeleteCampaignId(null);
+      setDeletingId(id);
+
+      const { deleteCampaignAction } = await import("../actions/campaign-actions");
+      await deleteCampaignAction(id);
+      fetchCampaigns(page, debouncedSearch);
+      showResult("success", "สำเร็จ");
+    } catch {
+      showResult("error", "เกิดข้อผิดพลาด", "ไม่สามารถลบได้ โปรดลองอีกครั้ง");
+    } finally {
+      setDeletingId(null);
+      setDeleteCampaignId(null);
     }
   };
 
@@ -283,6 +369,10 @@ export function CampaignList() {
                     campaignId={campaign.id}
                     status={campaign.status}
                     onCancel={() => setCancelCampaignId(campaign.id)}
+                    onResend={() => handleResend(campaign.id)}
+                    onDelete={() => setDeleteCampaignId(campaign.id)}
+                    isResending={resendingId === campaign.id}
+                    isDeleting={deletingId === campaign.id}
                   />
                 </td>
               </tr>
@@ -299,25 +389,39 @@ export function CampaignList() {
         />
       )}
 
-      <Modal
+      <ConfirmDialog
         isOpen={!!cancelCampaignId}
-        onClose={() => setCancelCampaignId(null)}
         title={t("cancelCampaignTitle")}
-      >
-        <div className="space-y-6">
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            {t("cancelCampaignDesc")}
-          </p>
-          <div className="flex justify-end gap-3">
-            <Button variant="secondary" onClick={() => setCancelCampaignId(null)}>
-              {t("close")}
-            </Button>
-            <Button variant="primary" className="bg-red-600 hover:bg-red-700 text-white" onClick={handleCancel}>
-              {t("confirmCancel")}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        description={t("cancelCampaignDesc")}
+        confirmLabel={t("confirmCancel")}
+        loading={isCancelling}
+        onConfirm={handleCancel}
+        onCancel={() => setCancelCampaignId(null)}
+      />
+
+      <LoadingOverlay
+        isOpen={!!resendingId}
+        message="กำลังโหลด...."
+      />
+
+      <LoadingOverlay
+        isOpen={!!deletingId}
+        message="กำลังโหลด...."
+      />
+
+      <ConfirmDialog
+        isOpen={!!deleteCampaignId}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteCampaignId(null)}
+      />
+
+      <ResultModal
+        isOpen={!!resultModal}
+        tone={resultModal?.tone ?? "success"}
+        title={resultModal?.title ?? ""}
+        description={resultModal?.description}
+        onClose={() => setResultModal(null)}
+      />
     </div>
   );
 }

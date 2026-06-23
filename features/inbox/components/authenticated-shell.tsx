@@ -1,15 +1,15 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { LanguageSwitcher } from "@/components/ui/language-switcher";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { classNames } from "@/lib/class-names";
+import { ChevronDown, ChevronRight, Megaphone, PieChart, Send, UserRound, Users } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import type { ReactNode, SVGProps } from "react";
-import { useState, useSyncExternalStore } from "react";
-import { logout } from "../services/inbox-service";
-import { Users, UserRound, PieChart, ChevronDown, ChevronRight, Megaphone, Send } from "lucide-react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { getConversations, logout } from "../services/inbox-service";
 
 type NavigationKey = "dashboard" | "customers" | "segments" | "inbox" | "marketing" | "publishing" | "campaigns" | "integrations" | "team" | "settings";
 
@@ -160,6 +160,30 @@ export function AuthenticatedShell({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchUnreadCount = async () => {
+      try {
+        const list = await getConversations();
+        if (!isMounted) return;
+        const count = list.filter((c: any) => c.unreadCount > 0).length;
+        setUnreadCount(count);
+      } catch (err) {
+        console.error("Failed to fetch conversations unread count", err);
+      }
+    };
+
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 5000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
     navigationItems.forEach((item) => {
@@ -328,10 +352,21 @@ export function AuthenticatedShell({
                         )}
                       >
                         <span className="flex min-w-0 items-center gap-3">
-                          <item.icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+                          <span className="relative">
+                            <item.icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+                            {isSidebarCollapsed && item.key === "inbox" && unreadCount > 0 && (
+                              <span className="absolute -right-2 -top-2 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-rose-500 px-0.5 text-[9px] font-bold text-white shadow-sm ring-1 ring-white/20 animate-pulse">
+                                {unreadCount}
+                              </span>
+                            )}
+                          </span>
                           <span className={classNames(isSidebarCollapsed && "lg:hidden")}>{label}</span>
                         </span>
-                        {!isSidebarCollapsed && activeNavigation === item.key ? (
+                        {item.key === "inbox" && unreadCount > 0 ? (
+                          <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white shadow-sm ring-1 ring-white/10 animate-pulse">
+                            {unreadCount}
+                          </span>
+                        ) : !isSidebarCollapsed && activeNavigation === item.key ? (
                           <span className="rounded-full bg-slate-950/10 px-2 py-1 text-[11px]">
                             {t("open")}
                           </span>

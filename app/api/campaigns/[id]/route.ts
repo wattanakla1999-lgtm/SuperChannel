@@ -5,9 +5,7 @@ import { CampaignMessageType, CampaignStatus, CampaignTargetType, IntegrationPro
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-export const maxDuration = 300;
-
-const CreateCampaignSchema = z.object({
+const UpdateCampaignSchema = z.object({
   name: z.string().min(1, "Name is required").max(150),
   description: z.string().max(500).optional(),
   channel: z.literal("LINE"),
@@ -33,15 +31,67 @@ const CreateCampaignSchema = z.object({
     .max(5),
 });
 
-export async function POST(request: Request) {
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getAuthenticatedSession();
+    if (!session?.organizationId) {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
+
+    const { id: campaignId } = await params;
+
+    const campaign = await prisma.campaign.findUnique({
+      where: { id: campaignId, organizationId: session.organizationId },
+      include: {
+        messages: { orderBy: { orderIndex: "asc" } },
+        segment: true,
+      },
+    });
+
+    if (!campaign) {
+      return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
+    }
+
+    return NextResponse.json(campaign);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[CAMPAIGNS_GET]", message);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function PUT(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const session = await getAuthenticatedSession();
     if (!session?.organizationId || !session?.accountId) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
+    const { id: campaignId } = await params;
+
+    const existingCampaign = await prisma.campaign.findUnique({
+      where: { id: campaignId, organizationId: session.organizationId },
+    });
+
+    if (!existingCampaign) {
+      return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
+    }
+
+    if (existingCampaign.status !== "DRAFT" && existingCampaign.status !== "SCHEDULED") {
+      return NextResponse.json(
+        { error: "Cannot edit campaign in current status" },
+        { status: 400 }
+      );
+    }
+
     const body = await request.json();
-    const parsed = CreateCampaignSchema.safeParse(body);
+    const parsed = UpdateCampaignSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
         { error: "Invalid request payload", details: parsed.error.issues },
@@ -49,7 +99,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { name, description, channel, targetType, segmentId, scheduledAt, isDraft, messages } = parsed.data;
+    const { name, description, targetType, segmentId, scheduledAt, isDraft, messages } = parsed.data;
 
     if (targetType === "TARGETED" && !segmentId) {
       return NextResponse.json(
@@ -69,9 +119,9 @@ export async function POST(request: Request) {
     }
 
     const campaign = await prisma.$transaction(async (tx) => {
-      const newCampaign = await tx.campaign.create({
+      const updatedCampaign = await tx.campaign.update({
+        where: { id: campaignId },
         data: {
-          organizationId: session.organizationId,
           name,
           description: description || null,
           channel: IntegrationProvider.LINE,
@@ -79,13 +129,18 @@ export async function POST(request: Request) {
           segmentId: segmentId ?? null,
           scheduledAt: isDraft ? null : (scheduledAt ? new Date(scheduledAt) : null),
           status: isDraft ? CampaignStatus.DRAFT : CampaignStatus.SCHEDULED,
-          createdByMemberId: session.accountId,
         },
       });
 
+      // Clear existing messages
+      await tx.campaignMessage.deleteMany({
+        where: { campaignId },
+      });
+
+      // Add new messages
       await tx.campaignMessage.createMany({
         data: messages.map((msg, i) => ({
-          campaignId: newCampaign.id,
+          campaignId,
           organizationId: session.organizationId,
           type: msg.type === "TEXT" ? CampaignMessageType.TEXT : CampaignMessageType.IMAGE,
           textContent: msg.type === "TEXT" ? msg.textContent : null,
@@ -97,27 +152,24 @@ export async function POST(request: Request) {
 
       await tx.campaignAuditLog.create({
         data: {
-          campaignId: newCampaign.id,
+          campaignId,
           organizationId: session.organizationId,
           actorMemberId: session.accountId,
-          action: "CREATE",
+          action: "UPDATE",
         },
       });
 
-      return newCampaign;
+      return updatedCampaign;
     });
 
     if (!isDraft && !scheduledAt) {
-      // For immediate send, process it in the background or await it.
-      // Awaiting means the user gets a loading state and waits until sent.
-      // We will await it to ensure it goes out right away.
       await processCampaignId(campaign.id);
     }
 
-    return NextResponse.json(campaign, { status: 201 });
+    return NextResponse.json(campaign);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error("[CAMPAIGNS_POST]", message);
+    console.error("[CAMPAIGNS_PUT]", message);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

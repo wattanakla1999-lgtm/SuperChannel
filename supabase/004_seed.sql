@@ -208,16 +208,17 @@ insert into public.customers (
   notes,
   status,
   unread_count,
-  last_interaction_at
+  last_interaction_at,
+  marketing_consent_status
 ) values
-  ('cust-line-nina', '11111111-1111-1111-1111-111111111111', 'member-agent-001', 'NT', 'Nina Tan', 'nina.tan@example.com', '+66 81 555 1244', 'Bangkok, Thailand', 'Prefers LINE support and same-day order updates.', 'open', 2, '2026-06-21T08:31:00.000Z'),
-  ('cust-fb-marco', '11111111-1111-1111-1111-111111111111', 'member-agent-002', 'MR', 'Marco Rivera', 'marco.rivera@example.com', '+63 917 800 4512', 'Manila, Philippines', 'Interested in reseller pricing for campaign bundles.', 'pending', 0, '2026-06-21T06:15:00.000Z'),
-  ('cust-ig-aya', '11111111-1111-1111-1111-111111111111', 'member-agent-003', 'AL', 'Aya Lim', 'aya.lim@example.com', '+65 9123 8876', 'Singapore', 'Frequently asks for image-ready product details.', 'resolved', 0, '2026-06-20T15:45:00.000Z'),
-  ('cust-tg-jonas', '11111111-1111-1111-1111-111111111111', 'member-supervisor-001', 'JH', 'Jonas Holt', 'jonas.holt@example.com', '+61 412 700 210', 'Sydney, Australia', 'Needs escalation path documented for operations incidents.', 'open', 1, '2026-06-21T02:09:00.000Z'),
-  ('cust-fb-lila', '11111111-1111-1111-1111-111111111111', 'member-agent-001', 'LP', 'Lila Perez', 'lila.perez@example.com', '+62 811 2200 984', 'Jakarta, Indonesia', 'Waiting on revised quote for weekend moderation support.', 'open', 3, '2026-06-21T07:44:00.000Z'),
-  ('cust-ig-mateo', '11111111-1111-1111-1111-111111111111', 'member-agent-003', 'MC', 'Mateo Cruz', 'mateo.cruz@example.com', '+63 945 771 0032', 'Cebu, Philippines', 'Strong visual direction, prefers approval batches every Tuesday.', 'pending', 0, '2026-06-21T07:10:00.000Z'),
-  ('cust-line-sora', '11111111-1111-1111-1111-111111111111', 'member-agent-002', 'SA', 'Sora Akiyama', 'sora.akiyama@example.com', '+81 80 2222 4401', 'Osaka, Japan', 'Escalate refund questions to local operations within one hour.', 'open', 1, '2026-06-21T05:55:00.000Z'),
-  ('cust-tg-emma', '11111111-1111-1111-1111-111111111111', 'member-supervisor-001', 'EL', 'Emma Liu', 'emma.liu@example.com', '+852 9822 1408', 'Hong Kong', 'Wants incident summaries attached to weekly stakeholder update.', 'resolved', 0, '2026-06-21T05:12:00.000Z')
+  ('cust-line-nina', '11111111-1111-1111-1111-111111111111', 'member-agent-001', 'NT', 'Nina Tan', 'nina.tan@example.com', '+66 81 555 1244', 'Bangkok, Thailand', 'Prefers LINE support and same-day order updates.', 'open', 2, '2026-06-21T08:31:00.000Z', 'opted_in'),
+  ('cust-fb-marco', '11111111-1111-1111-1111-111111111111', 'member-agent-002', 'MR', 'Marco Rivera', 'marco.rivera@example.com', '+63 917 800 4512', 'Manila, Philippines', 'Interested in reseller pricing for campaign bundles.', 'pending', 0, '2026-06-21T06:15:00.000Z', 'unknown'),
+  ('cust-ig-aya', '11111111-1111-1111-1111-111111111111', 'member-agent-003', 'AL', 'Aya Lim', 'aya.lim@example.com', '+65 9123 8876', 'Singapore', 'Frequently asks for image-ready product details.', 'resolved', 0, '2026-06-20T15:45:00.000Z', 'unknown'),
+  ('cust-tg-jonas', '11111111-1111-1111-1111-111111111111', 'member-supervisor-001', 'JH', 'Jonas Holt', 'jonas.holt@example.com', '+61 412 700 210', 'Sydney, Australia', 'Needs escalation path documented for operations incidents.', 'open', 1, '2026-06-21T02:09:00.000Z', 'unknown'),
+  ('cust-fb-lila', '11111111-1111-1111-1111-111111111111', 'member-agent-001', 'LP', 'Lila Perez', 'lila.perez@example.com', '+62 811 2200 984', 'Jakarta, Indonesia', 'Waiting on revised quote for weekend moderation support.', 'open', 3, '2026-06-21T07:44:00.000Z', 'unknown'),
+  ('cust-ig-mateo', '11111111-1111-1111-1111-111111111111', 'member-agent-003', 'MC', 'Mateo Cruz', 'mateo.cruz@example.com', '+63 945 771 0032', 'Cebu, Philippines', 'Strong visual direction, prefers approval batches every Tuesday.', 'pending', 0, '2026-06-21T07:10:00.000Z', 'unknown'),
+  ('cust-line-sora', '11111111-1111-1111-1111-111111111111', 'member-agent-002', 'SA', 'Sora Akiyama', 'sora.akiyama@example.com', '+81 80 2222 4401', 'Osaka, Japan', 'Escalate refund questions to local operations within one hour.', 'open', 1, '2026-06-21T05:55:00.000Z', 'opted_in'),
+  ('cust-tg-emma', '11111111-1111-1111-1111-111111111111', 'member-supervisor-001', 'EL', 'Emma Liu', 'emma.liu@example.com', '+852 9822 1408', 'Hong Kong', 'Wants incident summaries attached to weekly stakeholder update.', 'resolved', 0, '2026-06-21T05:12:00.000Z', 'unknown')
 on conflict (id) do update
 set assigned_member_id = excluded.assigned_member_id,
     avatar_fallback = excluded.avatar_fallback,
@@ -228,7 +229,8 @@ set assigned_member_id = excluded.assigned_member_id,
     notes = excluded.notes,
     status = excluded.status,
     unread_count = excluded.unread_count,
-    last_interaction_at = excluded.last_interaction_at;
+    last_interaction_at = excluded.last_interaction_at,
+    marketing_consent_status = excluded.marketing_consent_status;
 
 insert into public.customer_channel_identities (
   id,
@@ -238,13 +240,13 @@ insert into public.customer_channel_identities (
   handle,
   external_id
 ) values
-  ('60000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'cust-line-nina', 'line', '@ninatan.vip', 'line-99124'),
+  ('60000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'cust-line-nina', 'line', '@ninatan.vip', 'U1234567890abcdef1234567890nina12'),
   ('60000000-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111', 'cust-fb-marco', 'facebook', 'marco.rivera.growth', 'fb-22048'),
   ('60000000-0000-0000-0000-000000000003', '11111111-1111-1111-1111-111111111111', 'cust-ig-aya', 'instagram', '@ayalim.studio', 'ig-48119'),
   ('60000000-0000-0000-0000-000000000004', '11111111-1111-1111-1111-111111111111', 'cust-tg-jonas', 'telegram', '@jonasholt_ops', 'tg-70122'),
   ('60000000-0000-0000-0000-000000000005', '11111111-1111-1111-1111-111111111111', 'cust-fb-lila', 'facebook', 'lila.perez.shop', 'fb-61921'),
   ('60000000-0000-0000-0000-000000000006', '11111111-1111-1111-1111-111111111111', 'cust-ig-mateo', 'instagram', '@mateocruz.brand', 'ig-88910'),
-  ('60000000-0000-0000-0000-000000000007', '11111111-1111-1111-1111-111111111111', 'cust-line-sora', 'line', '@sora.home', 'line-23098'),
+  ('60000000-0000-0000-0000-000000000007', '11111111-1111-1111-1111-111111111111', 'cust-line-sora', 'line', '@sora.home', 'U9876543210fedcba9876543210sora34'),
   ('60000000-0000-0000-0000-000000000008', '11111111-1111-1111-1111-111111111111', 'cust-tg-emma', 'telegram', '@emma_liu_ops', 'tg-66211')
 on conflict (id) do update
 set handle = excluded.handle,
@@ -265,7 +267,7 @@ insert into public.conversations (
   last_message_at,
   external_thread_id
 ) values
-  ('conv-line-001', '11111111-1111-1111-1111-111111111111', 'cust-line-nina', 'member-agent-001', 'line', 'open', 'Perfect, thank you for the quick update.', 2, '2026-06-21T08:25:00.000Z', '2026-06-21T08:29:00.000Z', null, '2026-06-21T08:31:00.000Z', 'line-99124-thread'),
+  ('conv-line-001', '11111111-1111-1111-1111-111111111111', 'cust-line-nina', 'member-agent-001', 'line', 'open', 'Perfect, thank you for the quick update.', 2, '2026-06-21T08:25:00.000Z', '2026-06-21T08:29:00.000Z', null, '2026-06-21T08:31:00.000Z', 'U1234567890abcdef1234567890nina12-thread'),
   ('conv-fb-002', '11111111-1111-1111-1111-111111111111', 'cust-fb-marco', 'member-agent-002', 'facebook', 'pending', 'Absolutely. I can send the current partner deck and seat tiers.', 0, '2026-06-21T06:10:00.000Z', '2026-06-21T06:15:00.000Z', null, '2026-06-21T06:15:00.000Z', 'fb-22048-thread'),
   ('conv-ig-003', '11111111-1111-1111-1111-111111111111', 'cust-ig-aya', 'member-agent-003', 'instagram', 'resolved', 'Uploaded the launch creative with caption-safe spacing.', 0, '2026-06-20T15:40:00.000Z', '2026-06-20T15:45:00.000Z', '2026-06-20T15:45:00.000Z', '2026-06-20T15:45:00.000Z', 'ig-48119-thread'),
   ('conv-tg-004', '11111111-1111-1111-1111-111111111111', 'cust-tg-jonas', 'member-supervisor-001', 'telegram', 'open', 'Sending the incident timeline and mitigation snapshot now.', 1, '2026-06-21T02:05:00.000Z', '2026-06-21T02:09:00.000Z', null, '2026-06-21T02:09:00.000Z', 'tg-70122-thread')

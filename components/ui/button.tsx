@@ -1,10 +1,10 @@
-import type { ButtonHTMLAttributes } from "react";
 import { classNames } from "@/lib/class-names";
+import type { ButtonHTMLAttributes } from "react";
 import { Spinner } from "./spinner";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   loading?: boolean;
-  variant?: "primary" | "secondary" | "ghost";
+  variant?: "primary" | "secondary" | "ghost" | "danger";
 };
 
 const variantClasses = {
@@ -14,6 +14,8 @@ const variantClasses = {
     "border-transparent bg-slate-950 text-white hover:bg-slate-800 disabled:bg-slate-500 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400 dark:disabled:bg-cyan-800",
   secondary:
     "border-slate-300 bg-white text-slate-900 hover:bg-slate-50 disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 dark:disabled:bg-slate-800",
+  danger:
+    "border-transparent bg-rose-600 text-white hover:bg-rose-700 disabled:bg-rose-300 dark:bg-rose-600 dark:hover:bg-rose-500 dark:disabled:bg-rose-900",
 };
 
 export function Button({

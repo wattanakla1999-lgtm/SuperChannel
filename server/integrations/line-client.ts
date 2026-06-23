@@ -1,7 +1,7 @@
 import "server-only";
 
-import { createHmac, timingSafeEqual } from "node:crypto";
 import { serverEnv } from "@/server/env";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 type LineProfile = {
   displayName: string;
@@ -23,17 +23,21 @@ type LineContentResult = {
   contentType: string;
 };
 
-function getLineConfig() {
-  if (!serverEnv.lineChannelSecret || !serverEnv.lineChannelAccessToken) {
+function getLineConfig(override?: { apiBaseUrl?: string; channelAccessToken?: string; channelSecret?: string }) {
+  const apiBaseUrl = override?.apiBaseUrl ?? serverEnv.lineApiBaseUrl ?? "https://api.line.me";
+  const channelAccessToken = override?.channelAccessToken ?? serverEnv.lineChannelAccessToken;
+  const channelSecret = override?.channelSecret ?? serverEnv.lineChannelSecret;
+
+  if (!channelSecret || !channelAccessToken) {
     const error = new Error("LINE integration is not configured on this server.");
     error.name = "SERVICE_UNAVAILABLE";
     throw error;
   }
 
   return {
-    apiBaseUrl: serverEnv.lineApiBaseUrl ?? "https://api.line.me",
-    channelAccessToken: serverEnv.lineChannelAccessToken,
-    channelSecret: serverEnv.lineChannelSecret,
+    apiBaseUrl,
+    channelAccessToken,
+    channelSecret,
   };
 }
 
@@ -75,13 +79,13 @@ export function verifyLineSignature(rawBody: string, signature: string | null) {
   return provided.length === actual.length && timingSafeEqual(provided, actual);
 }
 
-export async function fetchLineProfile(userId: string): Promise<LineProfile> {
+export async function fetchLineProfile(userId: string, override?: { apiBaseUrl?: string; channelAccessToken?: string; channelSecret?: string }): Promise<LineProfile> {
   const cachedProfile = lineProfileCache.get(userId);
   if (cachedProfile && cachedProfile.expiresAt > Date.now()) {
     return cachedProfile.profile;
   }
 
-  const { apiBaseUrl, channelAccessToken } = getLineConfig();
+  const { apiBaseUrl, channelAccessToken } = getLineConfig(override);
 
   if (hasLineMockBaseUrl(apiBaseUrl)) {
     const profile = {
@@ -117,8 +121,8 @@ export async function fetchLineProfile(userId: string): Promise<LineProfile> {
   return profile;
 }
 
-export async function pushLineTextMessage(userId: string, text: string): Promise<LinePushResult> {
-  const { apiBaseUrl, channelAccessToken } = getLineConfig();
+export async function pushLineTextMessage(userId: string, text: string, override?: { apiBaseUrl?: string; channelAccessToken?: string; channelSecret?: string }): Promise<LinePushResult> {
+  const { apiBaseUrl, channelAccessToken } = getLineConfig(override);
 
   if (hasLineMockBaseUrl(apiBaseUrl)) {
     return {
@@ -126,22 +130,27 @@ export async function pushLineTextMessage(userId: string, text: string): Promise
     };
   }
 
-  const response = await fetch(
-    `${apiBaseUrl.replace(/\/$/, "")}/v2/bot/message/push`,
-    {
-      body: JSON.stringify({
-        messages: [{ text, type: "text" }],
-        to: userId,
-      }),
-      headers: {
-        Authorization: `Bearer ${channelAccessToken}`,
-        "Content-Type": "application/json",
-      },
-      method: "POST",
+  const url = `${apiBaseUrl.replace(/\/$/, "")}/v2/bot/message/push`;
+  const payload = {
+    messages: [{ text, type: "text" }],
+    to: userId,
+  };
+
+  console.info(`[LINE] pushText -> url=${url} to=${userId} payloadSize=${JSON.stringify(payload).length}`);
+
+  const response = await fetch(url, {
+    body: JSON.stringify(payload),
+    headers: {
+      Authorization: `Bearer ${channelAccessToken}`,
+      "Content-Type": "application/json",
     },
-  );
+    method: "POST",
+  });
 
   await parseLineResponse(response);
+
+  const respText = await response.text().catch(() => "");
+  console.info(`[LINE] pushText response status=${response.status} body=${respText?.slice(0, 1000)}`);
 
   return {
     requestId: response.headers.get("x-line-request-id"),
@@ -152,8 +161,9 @@ export async function pushLineImageMessage(
   userId: string,
   originalContentUrl: string,
   previewImageUrl: string,
+  override?: { apiBaseUrl?: string; channelAccessToken?: string; channelSecret?: string },
 ): Promise<LinePushResult> {
-  const { apiBaseUrl, channelAccessToken } = getLineConfig();
+  const { apiBaseUrl, channelAccessToken } = getLineConfig(override);
 
   if (hasLineMockBaseUrl(apiBaseUrl)) {
     return {
@@ -161,28 +171,33 @@ export async function pushLineImageMessage(
     };
   }
 
-  const response = await fetch(
-    `${apiBaseUrl.replace(/\/$/, "")}/v2/bot/message/push`,
-    {
-      body: JSON.stringify({
-        messages: [
-          {
-            originalContentUrl,
-            previewImageUrl,
-            type: "image",
-          },
-        ],
-        to: userId,
-      }),
-      headers: {
-        Authorization: `Bearer ${channelAccessToken}`,
-        "Content-Type": "application/json",
+  const url = `${apiBaseUrl.replace(/\/$/, "")}/v2/bot/message/push`;
+  const payload = {
+    messages: [
+      {
+        originalContentUrl,
+        previewImageUrl,
+        type: "image",
       },
-      method: "POST",
+    ],
+    to: userId,
+  };
+
+  console.info(`[LINE] pushImage -> url=${url} to=${userId} payloadSize=${JSON.stringify(payload).length}`);
+
+  const response = await fetch(url, {
+    body: JSON.stringify(payload),
+    headers: {
+      Authorization: `Bearer ${channelAccessToken}`,
+      "Content-Type": "application/json",
     },
-  );
+    method: "POST",
+  });
 
   await parseLineResponse(response);
+
+  const respText = await response.text().catch(() => "");
+  console.info(`[LINE] pushImage response status=${response.status} body=${respText?.slice(0, 1000)}`);
 
   return {
     requestId: response.headers.get("x-line-request-id"),
@@ -193,8 +208,9 @@ export async function pushLineMulticastMessage(
   userIds: string[],
   messages: Record<string, unknown>[],
   retryKey?: string,
+  override?: { apiBaseUrl?: string; channelAccessToken?: string; channelSecret?: string },
 ): Promise<LinePushResult> {
-  const { apiBaseUrl, channelAccessToken } = getLineConfig();
+  const { apiBaseUrl, channelAccessToken } = getLineConfig(override);
 
   if (hasLineMockBaseUrl(apiBaseUrl)) {
     return {
@@ -211,27 +227,29 @@ export async function pushLineMulticastMessage(
     headers["X-Line-Retry-Key"] = retryKey;
   }
 
-  const response = await fetch(
-    `${apiBaseUrl.replace(/\/$/, "")}/v2/bot/message/multicast`,
-    {
-      body: JSON.stringify({
-        messages,
-        to: userIds,
-      }),
-      headers,
-      method: "POST",
-    },
-  );
+  const url = `${apiBaseUrl.replace(/\/$/, "")}/v2/bot/message/multicast`;
+  const payload = { messages, to: userIds };
+
+  console.info(`[LINE] multicast -> url=${url} recipients=${userIds.length} sample=${userIds.slice(0,5).join(",")} retryKey=${retryKey ? 'present' : 'none'} payloadSize=${JSON.stringify(payload).length}`);
+
+  const response = await fetch(url, {
+    body: JSON.stringify(payload),
+    headers,
+    method: "POST",
+  });
 
   await parseLineResponse(response);
+
+  const respText = await response.text().catch(() => "");
+  console.info(`[LINE] multicast response status=${response.status} body=${respText?.slice(0, 2000)}`);
 
   return {
     requestId: response.headers.get("x-line-request-id"),
   };
 }
 
-export async function fetchLineMessageContent(messageId: string): Promise<LineContentResult> {
-  const { apiBaseUrl, channelAccessToken } = getLineConfig();
+export async function fetchLineMessageContent(messageId: string, override?: { apiBaseUrl?: string; channelAccessToken?: string; channelSecret?: string }): Promise<LineContentResult> {
+  const { apiBaseUrl, channelAccessToken } = getLineConfig(override);
   const contentBaseUrl = getLineContentBaseUrl(apiBaseUrl);
 
   if (hasLineMockBaseUrl(contentBaseUrl)) {

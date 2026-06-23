@@ -1,12 +1,12 @@
 "use client";
 
-import Image from "next/image";
-import { FileAudio2 } from "lucide-react";
-import { useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { classNames } from "@/lib/class-names";
-import { ConversationMessage } from "../types/inbox";
+import { FileAudio2 } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
+import Image from "next/image";
+import { useState } from "react";
+import { ConversationMessage } from "../types/inbox";
 
 type MessageBubbleProps = {
   isFirstOfDay?: boolean;
@@ -74,7 +74,7 @@ export default function MessageBubble({ isFirstOfDay = false, message, customerA
           )
         ) : null}
 
-        <div className={classNames("max-w-[78%] sm:max-w-[70%]", isOutbound && "order-1")}>
+        <div className={classNames("flex flex-col max-w-[78%] sm:max-w-[70%]", isOutbound ? "order-1 items-end" : "items-start")}>
           <div className={classNames("mb-1 flex items-center gap-2 px-1 text-[11px] text-slate-400 dark:text-slate-500", isOutbound && "justify-end")}>
             <span className="truncate">{message.senderName}</span>
             <span>
