@@ -90,21 +90,55 @@ function readSupabaseStoragePath(storagePath: string | null) {
   return storagePath.slice("supabase:".length);
 }
 
-async function resolveLineAvatarImageUrl(
-  channelIdentities: Array<{ channel: ChannelType; externalId: string }>,
+async function resolveAvatarImageUrl(
+  customer: {
+    id: string;
+    avatarUrl?: string | null;
+    profileUpdatedAt?: Date | null;
+    channelIdentities: Array<{ channel: ChannelType; externalId: string }>;
+  }
 ) {
-  const lineIdentity = channelIdentities.find((identity) => identity.channel === "LINE");
+  const lineIdentity = customer.channelIdentities.find((identity) => identity.channel === "LINE");
+  if (lineIdentity) {
+    const now = new Date();
+    const isCacheValid =
+      customer.avatarUrl &&
+      customer.profileUpdatedAt &&
+      (now.getTime() - customer.profileUpdatedAt.getTime()) < 24 * 60 * 60 * 1000;
 
-  if (!lineIdentity) {
-    return null;
+    if (isCacheValid) {
+      return customer.avatarUrl;
+    }
+
+    try {
+      const profile = await fetchLineProfile(lineIdentity.externalId);
+      const pictureUrl = profile.pictureUrl ?? null;
+
+      // Update database cache in the background (avoid blocking API response)
+      prisma.customer.update({
+        data: {
+          avatarUrl: pictureUrl,
+          profileUpdatedAt: new Date(),
+        },
+        where: {
+          id: customer.id,
+        },
+      }).catch((e) => console.error("[LINE_PROFILE_CACHE] Failed to update profile cache in DB", e));
+
+      return pictureUrl;
+    } catch {
+      return customer.avatarUrl ?? null;
+    }
   }
 
-  try {
-    const profile = await fetchLineProfile(lineIdentity.externalId);
-    return profile.pictureUrl ?? null;
-  } catch {
-    return null;
+  const metaIdentity = customer.channelIdentities.find(
+    (identity) => identity.channel === "FACEBOOK" || identity.channel === "INSTAGRAM"
+  );
+  if (metaIdentity) {
+    return customer.avatarUrl ?? null;
   }
+
+  return null;
 }
 
 function toCustomerSummary(customer: {
@@ -252,7 +286,7 @@ export async function listCustomersFromDatabase(
   const customersWithAvatars = await Promise.all(
     customers.map(async (customer) => ({
       ...customer,
-      avatarImageUrl: await resolveLineAvatarImageUrl(customer.channelIdentities),
+      avatarImageUrl: await resolveAvatarImageUrl(customer),
     })),
   );
 
@@ -304,7 +338,7 @@ export async function getCustomerDetailFromDatabase(session: AuthenticatedSessio
 
   const summary = toCustomerSummary({
     ...customer,
-    avatarImageUrl: await resolveLineAvatarImageUrl(customer.channelIdentities),
+    avatarImageUrl: await resolveAvatarImageUrl(customer),
   });
 
   return {
@@ -449,7 +483,7 @@ export async function listConversationSummariesFromDatabase(session: Authenticat
       channel: toInboxChannel(conversation.channel),
       customerAvatarFallback:
         conversation.customer.avatarFallback ?? conversation.customer.name.slice(0, 2).toUpperCase(),
-      customerAvatarImageUrl: await resolveLineAvatarImageUrl(conversation.customer.channelIdentities),
+      customerAvatarImageUrl: await resolveAvatarImageUrl(conversation.customer),
       customerId: conversation.customerId,
       customerName: conversation.customer.name,
       id: conversation.id,
@@ -522,7 +556,7 @@ export async function getConversationDetailFromDatabase(
     channel: toInboxChannel(conversation.channel),
     customerAvatarFallback:
       conversation.customer.avatarFallback ?? conversation.customer.name.slice(0, 2).toUpperCase(),
-    customerAvatarImageUrl: await resolveLineAvatarImageUrl(conversation.customer.channelIdentities),
+    customerAvatarImageUrl: await resolveAvatarImageUrl(conversation.customer),
     customerId: conversation.customerId,
     customerName: conversation.customer.name,
     id: conversation.id,
@@ -536,7 +570,7 @@ export async function getConversationDetailFromDatabase(
   return {
     conversation: summary,
     customer: {
-      avatarImageUrl: await resolveLineAvatarImageUrl(conversation.customer.channelIdentities),
+      avatarImageUrl: await resolveAvatarImageUrl(conversation.customer),
       avatarFallback:
         conversation.customer.avatarFallback ?? conversation.customer.name.slice(0, 2).toUpperCase(),
       customerTags: conversation.customer.tags.map(({ tag }) => ({ id: tag.id, name: tag.name, color: tag.color })),

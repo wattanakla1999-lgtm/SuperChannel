@@ -179,7 +179,14 @@ test.describe("facebook webhook", () => {
     const conversationsResponse = await page.request.get("/api/inbox/conversations");
     expect(conversationsResponse.status()).toBe(200);
     const conversations = (await conversationsResponse.json()) as {
-      conversations: Array<{ channel: string; id: string; preview: string; unreadCount: number }>;
+      conversations: Array<{
+        channel: string;
+        id: string;
+        preview: string;
+        unreadCount: number;
+        customerName: string;
+        customerAvatarImageUrl: string | null;
+      }>;
     };
     const matchingConversations = conversations.conversations.filter(
       (conversation) =>
@@ -188,6 +195,8 @@ test.describe("facebook webhook", () => {
 
     expect(matchingConversations).toHaveLength(1);
     expect(matchingConversations[0].unreadCount).toBe(2);
+    expect(matchingConversations[0].customerName).toBe("Marco Rivera");
+    expect(matchingConversations[0].customerAvatarImageUrl).toBe("https://example.invalid/fb/marco.jpg");
 
     const detailResponse = await page.request.get(
       `/api/inbox/conversations/${matchingConversations[0].id}`,
@@ -206,5 +215,7 @@ test.describe("facebook webhook", () => {
       secondTextBody,
     ]);
     expect(detail.conversation.preview).toBe(secondTextBody);
+    expect(detail.customer.name).toBe("Marco Rivera");
+    expect(detail.customer.avatarImageUrl).toBe("https://example.invalid/fb/marco.jpg");
   });
 });

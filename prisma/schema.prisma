@@ -403,6 +403,8 @@ model Customer {
   assignedMemberId          String?                   @map("assigned_member_id") @db.Uuid
   primaryConversationId     String?                   @unique @map("primary_conversation_id")
   avatarFallback            String?                   @map("avatar_fallback")
+  avatarUrl                 String?                   @map("avatar_url")
+  profileUpdatedAt          DateTime?                 @map("profile_updated_at") @db.Timestamptz(6)
   name                      String
   email                     String?
   phone                     String?

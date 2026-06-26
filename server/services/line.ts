@@ -43,24 +43,28 @@ function isUniqueConstraintError(error: unknown) {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
 }
 
-function toConversationSummary(conversation: {
-  assignedMember: { profile: { fullName: string } } | null;
-  channel: "LINE";
-  createdAt: Date;
-  customer: { avatarFallback: string | null; id: string; name: string };
-  customerId: string;
-  id: string;
-  lastMessageAt: Date | null;
-  previewText: string | null;
-  status: "OPEN" | "PENDING" | "RESOLVED";
-  tags: Array<{ tag: { id: string; name: string; color: string | null } }>;
-  unreadCount: number;
-}): ConversationSummary {
+function toConversationSummary(
+  conversation: {
+    assignedMember: { profile: { fullName: string } } | null;
+    channel: "LINE";
+    createdAt: Date;
+    customer: { avatarFallback: string | null; id: string; name: string };
+    customerId: string;
+    id: string;
+    lastMessageAt: Date | null;
+    previewText: string | null;
+    status: "OPEN" | "PENDING" | "RESOLVED";
+    tags: Array<{ tag: { id: string; name: string; color: string | null } }>;
+    unreadCount: number;
+  },
+  customerAvatarImageUrl?: string | null,
+): ConversationSummary {
   return {
     assignedAgent: conversation.assignedMember?.profile.fullName ?? "Unassigned",
     channel: "LINE",
     customerAvatarFallback:
       conversation.customer.avatarFallback ?? conversation.customer.name.slice(0, 2).toUpperCase(),
+    customerAvatarImageUrl: customerAvatarImageUrl ?? null,
     customerId: conversation.customerId,
     customerName: conversation.customer.name,
     id: conversation.id,
@@ -657,20 +661,25 @@ export async function sendLineReplyFromInbox(
 
   await markIntegrationHealthy(integration.id);
 
+  const lineProfile = await fetchLineProfile(recipient.externalId).catch(() => null);
+
   return {
-    conversation: toConversationSummary({
-      assignedMember: conversation.assignedMember,
-      channel: "LINE",
-      createdAt: conversation.createdAt,
-      customer: conversation.customer,
-      customerId: conversation.customerId,
-      id: conversation.id,
-      lastMessageAt: createdAt,
-      previewText: body,
-      status: conversation.status,
-      tags: conversation.tags,
-      unreadCount: 0,
-    }),
+    conversation: toConversationSummary(
+      {
+        assignedMember: conversation.assignedMember,
+        channel: "LINE",
+        createdAt: conversation.createdAt,
+        customer: conversation.customer,
+        customerId: conversation.customerId,
+        id: conversation.id,
+        lastMessageAt: createdAt,
+        previewText: body,
+        status: conversation.status,
+        tags: conversation.tags,
+        unreadCount: 0,
+      },
+      lineProfile?.pictureUrl,
+    ),
     message: {
       body: message.body,
       createdAt: message.createdAt.toISOString(),
@@ -809,20 +818,25 @@ export async function sendLineImageReplyFromInbox(
 
   await markIntegrationHealthy(integration.id);
 
+  const lineProfile = await fetchLineProfile(recipient.externalId).catch(() => null);
+
   return {
-    conversation: toConversationSummary({
-      assignedMember: conversation.assignedMember,
-      channel: "LINE",
-      createdAt: conversation.createdAt,
-      customer: conversation.customer,
-      customerId: conversation.customerId,
-      id: conversation.id,
-      lastMessageAt: createdAt,
-      previewText: "Image attachment",
-      status: conversation.status,
-      tags: conversation.tags,
-      unreadCount: 0,
-    }),
+    conversation: toConversationSummary(
+      {
+        assignedMember: conversation.assignedMember,
+        channel: "LINE",
+        createdAt: conversation.createdAt,
+        customer: conversation.customer,
+        customerId: conversation.customerId,
+        id: conversation.id,
+        lastMessageAt: createdAt,
+        previewText: "Image attachment",
+        status: conversation.status,
+        tags: conversation.tags,
+        unreadCount: 0,
+      },
+      lineProfile?.pictureUrl,
+    ),
     message: {
       body: "",
       createdAt: message.createdAt.toISOString(),

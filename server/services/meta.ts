@@ -36,6 +36,7 @@ type MetaMessagingEvent = {
         url: string;
       };
     }>;
+    is_echo?: boolean;
   };
   postback?: unknown;
   read?: unknown;
@@ -85,7 +86,7 @@ function toConversationSummary(
     assignedMember: { profile: { fullName: string } } | null;
     channel: "FACEBOOK" | "INSTAGRAM";
     createdAt: Date;
-    customer: { avatarFallback: string | null; id: string; name: string };
+    customer: { avatarFallback: string | null; id: string; name: string; avatarUrl?: string | null };
     customerId: string;
     id: string;
     lastMessageAt: Date | null;
@@ -101,6 +102,7 @@ function toConversationSummary(
     channel,
     customerAvatarFallback:
       conversation.customer.avatarFallback ?? conversation.customer.name.slice(0, 2).toUpperCase(),
+    customerAvatarImageUrl: conversation.customer.avatarUrl ?? null,
     customerId: conversation.customerId,
     customerName: conversation.customer.name,
     id: conversation.id,
@@ -128,11 +130,7 @@ async function ensureMetaConversationContext(
   organizationId: string,
   channel: "FACEBOOK" | "INSTAGRAM",
   userId: string,
-  profile?: {
-    name: string;
-    username?: string;
-    pictureUrl?: string;
-  } | null,
+  integration: IntegrationWithCredentials,
   pageId?: string,
 ) {
   const externalId = buildMetaScopedExternalId(channel, userId, pageId);
@@ -174,18 +172,50 @@ async function ensureMetaConversationContext(
     },
   });
 
+  let displayName = identity?.customer?.name;
+  let avatarUrl = identity?.customer?.avatarUrl;
+  let username: string | undefined = undefined;
+
   if (identity) {
-    const displayName = profile?.name?.trim();
-    if (displayName && displayName !== identity.customer.name) {
-      await prisma.customer.update({
-        data: {
-          avatarFallback: displayName.slice(0, 2).toUpperCase(),
+    const customer = identity.customer;
+    const now = new Date();
+    const isPlaceholder = customer.name.startsWith("Facebook User") || customer.name.startsWith("Instagram User");
+    const isCacheValid =
+      customer.name &&
+      !isPlaceholder &&
+      customer.avatarUrl &&
+      customer.profileUpdatedAt &&
+      (now.getTime() - customer.profileUpdatedAt.getTime()) < 24 * 60 * 60 * 1000;
+
+    if (!isCacheValid) {
+      try {
+        const accessToken = await getDecryptedAccessToken(integration);
+        const metaProfile = await fetchMetaProfile(userId, channel.toLowerCase() as "facebook" | "instagram", accessToken);
+        displayName = metaProfile.name;
+        avatarUrl = metaProfile.pictureUrl || null;
+        username = metaProfile.username;
+        
+        await prisma.customer.update({
+          data: {
+            name: displayName,
+            avatarUrl: avatarUrl,
+            avatarFallback: displayName.slice(0, 2).toUpperCase(),
+            profileUpdatedAt: new Date(),
+          },
+          where: {
+            id: customer.id,
+          },
+        });
+        console.log(`[META_PROFILE_SYNC] Success: Scoped profile synced for customer ${customer.id}`, {
+          psid: userId,
           name: displayName,
-        },
-        where: {
-          id: identity.customerId,
-        },
-      });
+        });
+      } catch (error) {
+        console.error(`[META_PROFILE_SYNC] Failure: Failed to sync profile for customer ${customer.id}`, {
+          psid: userId,
+          error,
+        });
+      }
     }
 
     const conversation = identity.customer.conversations[0];
@@ -282,10 +312,27 @@ async function ensureMetaConversationContext(
     }
   }
 
-  // Neither identity nor conversation exists. Create Customer, Identity, and Conversation.
-  const displayName =
-    profile?.name?.trim() ||
-    `${channel === "FACEBOOK" ? "Facebook" : "Instagram"} User ${userId.slice(-4)}`;
+  displayName = `${channel === "FACEBOOK" ? "Facebook" : "Instagram"} User ${userId.slice(-4)}`;
+  let profileUpdatedAt: Date | null = null;
+
+  try {
+    const accessToken = await getDecryptedAccessToken(integration);
+    const metaProfile = await fetchMetaProfile(userId, channel.toLowerCase() as "facebook" | "instagram", accessToken);
+    displayName = metaProfile.name;
+    avatarUrl = metaProfile.pictureUrl || null;
+    username = metaProfile.username;
+    profileUpdatedAt = new Date();
+    console.log(`[META_PROFILE_SYNC] Success: Scoped profile synced for new customer`, {
+      psid: userId,
+      name: displayName,
+    });
+  } catch (error) {
+    console.error(`[META_PROFILE_SYNC] Failure: Failed to sync profile for new customer`, {
+      psid: userId,
+      error,
+    });
+  }
+
   const customerId = `cust-meta-${channel.toLowerCase()}-${crypto.randomUUID()}`;
   const conversationId = `conv-meta-${channel.toLowerCase()}-${crypto.randomUUID()}`;
 
@@ -338,13 +385,15 @@ async function ensureMetaConversationContext(
         return {
           conversationId: existingConv.id,
           customerId: existingId.customerId,
-          customerName: profile?.name?.trim() || existingId.customer.name,
+          customerName: displayName || existingId.customer.name,
         };
       }
 
       await tx.customer.create({
         data: {
           avatarFallback: displayName.slice(0, 2).toUpperCase(),
+          avatarUrl,
+          profileUpdatedAt,
           id: customerId,
           lastInteractionAt: new Date(),
           name: displayName,
@@ -359,7 +408,7 @@ async function ensureMetaConversationContext(
           channel,
           customerId,
           externalId,
-          handle: profile?.username || displayName,
+          handle: username || displayName,
           organizationId,
         },
       });
@@ -439,7 +488,7 @@ async function ensureMetaConversationContext(
         return {
           conversationId: fallbackConv.id,
           customerId: fallbackId.customerId,
-          customerName: profile?.name?.trim() || fallbackId.customer.name,
+          customerName: displayName || fallbackId.customer.name,
         };
       }
     }
@@ -465,7 +514,7 @@ async function getDecryptedAccessToken(integration: IntegrationWithCredentials) 
     }
   }
 
-  return process.env.META_PAGE_ACCESS_TOKEN ?? "mock-page-access-token";
+  return process.env.FACEBOOK_PAGE_ACCESS_TOKEN ?? process.env.META_PAGE_ACCESS_TOKEN ?? "mock-page-access-token";
 }
 
 function getAvailableAccountIds(integration: IntegrationWithCredentials) {
@@ -561,26 +610,11 @@ async function handleMetaMessageEvent(
     return;
   }
 
-  const externalId = buildMetaScopedExternalId(channel, userId, options?.pageId);
-  const existingIdentity = await prisma.customerChannelIdentity.findFirst({
-    where: {
-      channel,
-      externalId,
-      organizationId,
-    },
-  });
-
-  let profile = null;
-  if (!existingIdentity) {
-    const accessToken = await getDecryptedAccessToken(integration);
-    profile = await fetchMetaProfile(userId, channel.toLowerCase() as "facebook" | "instagram", accessToken).catch(() => null);
-  }
-
   const context = await ensureMetaConversationContext(
     organizationId,
     channel,
     userId,
-    profile,
+    integration,
     options?.pageId,
   );
   const messageId = `meta-msg-${metaMessage.mid}`;
@@ -721,6 +755,10 @@ export async function processMetaWebhookPayload(payload: MetaWebhookBody) {
         continue;
       }
 
+      if (event.message?.is_echo) {
+        continue;
+      }
+
       const messageId = `meta-msg-${mid}`;
       const existingMessage = await prisma.conversationMessage.findUnique({
         where: {
@@ -809,6 +847,10 @@ export async function processMetaWebhookPayload(payload: MetaWebhookBody) {
 function getFacebookIgnoredReason(payload: MetaWebhookBody, event: MetaMessagingEvent) {
   if (payload.object !== "page") {
     return "unsupported_object";
+  }
+
+  if (event.message?.is_echo) {
+    return "echo_message";
   }
 
   if (event.delivery) {
