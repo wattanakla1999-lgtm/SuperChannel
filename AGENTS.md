@@ -181,19 +181,6 @@ For every task:
 4. Run a production build for routing, configuration, or broad changes.
 5. Verify the affected workflow end to end when practical.
 
-### Playwright E2E
-
-- Store tests under `tests/e2e/`.
-- Run `npm run test:e2e` for every changed user-facing workflow.
-- Generate the HTML report under `report/playwright-report/`.
-- Store screenshots, videos, and traces under `report/test-results/`.
-- Do not commit `report/`.
-- Review the HTML report before declaring the workflow complete.
-- Include Playwright results in the final summary.
-
-Do not claim a flow works without checking it. State anything that could not be
-verified.
-
 ## Definition Of Done
 
 - The requested behavior is implemented without unrelated scope expansion.

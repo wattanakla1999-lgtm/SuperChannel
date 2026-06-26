@@ -26,7 +26,7 @@ function dedupeRequest<T>(key: string, request: () => Promise<T>) {
 
 export async function getConversations() {
   const response = await dedupeRequest("inbox:conversations", () =>
-    apiClient.get<InboxConversationsResponse>("/api/inbox/conversations"),
+    apiClient.get<InboxConversationsResponse>(`/api/inbox/conversations?_t=${Date.now()}`),
   );
   return response.data.conversations;
 }
@@ -34,7 +34,7 @@ export async function getConversations() {
 export async function getConversation(conversationId: string) {
   const response = await dedupeRequest(`inbox:conversation:${conversationId}`, () =>
     apiClient.get<InboxConversationResponse>(
-      `/api/inbox/conversations/${conversationId}`,
+      `/api/inbox/conversations/${conversationId}?_t=${Date.now()}`,
     ),
   );
   return response.data;

@@ -1,9 +1,10 @@
 import "server-only";
 
-import { prisma } from "@/server/database/prisma";
 import type { IntegrationProvider } from "@/features/integrations/types/integrations";
-import type { AuthenticatedSession } from "@/server/auth/session";
 import { isOwnerOrAdmin } from "@/server/auth/roles";
+import type { AuthenticatedSession } from "@/server/auth/session";
+import { prisma } from "@/server/database/prisma";
+import { encryptCredentialPayload } from "@/server/security/encryption";
 
 function assertManageIntegrations(session: AuthenticatedSession) {
   if (!isOwnerOrAdmin(session)) {
@@ -101,6 +102,33 @@ export async function connectIntegrationInDatabase(
     where: { id: integration.id },
   });
 
+  const payload = {
+    accessToken: `mock-token-${provider}-${accountId}`,
+    accountId,
+    accountName: account.label,
+  };
+  const encrypted = encryptCredentialPayload(payload);
+
+  await prisma.integrationCredential.upsert({
+    create: {
+      authTag: encrypted.authTag,
+      encryptedPayload: encrypted.ciphertext,
+      integrationId: integration.id,
+      iv: encrypted.iv,
+      keyVersion: encrypted.keyVersion,
+      organizationId: session.organizationId,
+    },
+    update: {
+      authTag: encrypted.authTag,
+      encryptedPayload: encrypted.ciphertext,
+      iv: encrypted.iv,
+      keyVersion: encrypted.keyVersion,
+    },
+    where: {
+      integrationId: integration.id,
+    },
+  });
+
   return {
     integration: mapIntegration(updated),
     message: `${updated.providerName} connected successfully.`,
@@ -171,6 +199,12 @@ export async function disconnectIntegrationInDatabase(
   if (!integration) {
     return null;
   }
+
+  await prisma.integrationCredential.deleteMany({
+    where: {
+      integrationId: integration.id,
+    },
+  });
 
   const updated = await prisma.integration.update({
     data: {

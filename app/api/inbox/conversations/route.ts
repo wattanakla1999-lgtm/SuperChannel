@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 import { getAuthenticatedSession } from "@/server/auth/session";
 import { unauthorizedResponse } from "@/server/http/responses";
@@ -12,5 +14,12 @@ export async function GET() {
 
   const conversations = await listConversationSummariesFromDatabase(session);
 
-  return NextResponse.json({ conversations });
+  return NextResponse.json(
+    { conversations },
+    {
+      headers: {
+        "Cache-Control": "no-store, max-age=0, must-revalidate",
+      },
+    },
+  );
 }

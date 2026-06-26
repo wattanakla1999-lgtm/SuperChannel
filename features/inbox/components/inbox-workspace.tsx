@@ -58,7 +58,7 @@ import PanelResizeDivider from "./PanelResizeDivider";
 
 const filters: ConversationStatus[] = ["all", "unread", "open", "pending", "resolved"];
 const LIST_POLL_INTERVAL_MS = 4_000;
-const DETAIL_POLL_INTERVAL_MS = 3_000;
+const DETAIL_POLL_INTERVAL_MS = 2_500;
 
 const channelClasses: Record<InboxChannel, string> = {
   Facebook: "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-200",
@@ -783,10 +783,18 @@ export function InboxWorkspace({
     activeConversation && activeDetail?.conversation.id === selectedConversationId
       ? activeDetail.customer
       : null;
-  const activeMessages =
+  const activeMessagesRaw =
     activeConversation && activeDetail?.conversation.id === selectedConversationId
       ? activeDetail.messages
       : [];
+  const seenMessages = new Set<string>();
+  const activeMessages = activeMessagesRaw.filter((msg) => {
+    if (seenMessages.has(msg.id)) {
+      return false;
+    }
+    seenMessages.add(msg.id);
+    return true;
+  });
   const latestMessageId = activeMessages[activeMessages.length - 1]?.id ?? null;
   const areFiltersInteractive = isHydrated && !isListLoading;
   const normalizedSavedReplySearch = savedReplySearch.trim().toLowerCase();

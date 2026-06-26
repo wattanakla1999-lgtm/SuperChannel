@@ -1,18 +1,19 @@
 import "server-only";
 
-import type { ChannelType, ConversationStatus, Prisma } from "@prisma/client";
-import { prisma } from "@/server/database/prisma";
 import type {
-  CustomerActivityEntry,
-  CustomerDetail,
-  CustomerListResponse,
-  CustomerSummary,
+    CustomerActivityEntry,
+    CustomerDetail,
+    CustomerListResponse,
+    CustomerSummary,
 } from "@/features/customers/types/customers";
 import type { ConversationDetail, ConversationSummary } from "@/features/inbox/types/inbox";
 import type { AuthenticatedSession } from "@/server/auth/session";
+import { prisma } from "@/server/database/prisma";
 import { fetchLineProfile } from "@/server/integrations/line-client";
-import { createSignedAttachmentUrl, downloadStoredAttachment, uploadConversationImage } from "@/server/storage/message-attachments";
 import { getLineAttachmentContent, sendLineImageReplyFromInbox, sendLineReplyFromInbox } from "@/server/services/line";
+import { sendMetaImageReplyFromInbox, sendMetaReplyFromInbox } from "@/server/services/meta";
+import { createSignedAttachmentUrl, downloadStoredAttachment, uploadConversationImage } from "@/server/storage/message-attachments";
+import type { ChannelType, ConversationStatus, Prisma } from "@prisma/client";
 
 const inboxChannelLabels = {
   FACEBOOK: "Facebook",
@@ -427,7 +428,16 @@ export async function listConversationSummariesFromDatabase(session: Authenticat
       },
       tags: { include: { tag: true } },
     },
-    orderBy: { lastMessageAt: "desc" },
+    orderBy: [
+      {
+        customer: {
+          lastInteractionAt: "desc",
+        },
+      },
+      {
+        lastMessageAt: "desc",
+      },
+    ],
     where: {
       organizationId: session.organizationId,
     },
@@ -594,6 +604,12 @@ export async function appendConversationMessageFromDatabase(
     return lineResult;
   }
 
+  const metaResult = await sendMetaReplyFromInbox(session, conversationId, body);
+
+  if (metaResult) {
+    return metaResult;
+  }
+
   const conversation = await prisma.conversation.findFirst({
     include: {
       assignedMember: { include: { profile: true } },
@@ -700,6 +716,16 @@ export async function appendConversationImageFromDatabase(
         originalContentUrl: signedUrl,
         previewImageUrl: signedUrl,
       },
+    );
+  }
+
+  if (conversation.channel === "FACEBOOK" || conversation.channel === "INSTAGRAM") {
+    const signedUrl = await createSignedAttachmentUrl(uploaded.storagePath);
+    return sendMetaImageReplyFromInbox(
+      session,
+      conversationId,
+      uploaded,
+      signedUrl,
     );
   }
 
