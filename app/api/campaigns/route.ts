@@ -10,7 +10,7 @@ export const maxDuration = 300;
 const CreateCampaignSchema = z.object({
   name: z.string().min(1, "Name is required").max(150),
   description: z.string().max(500).optional(),
-  channel: z.literal("LINE"),
+  channel: z.nativeEnum(IntegrationProvider).default(IntegrationProvider.LINE),
   targetType: z.enum(["BROADCAST", "TARGETED"]),
   segmentId: z.string().uuid().nullish(),
   scheduledAt: z.string().datetime().nullish(),
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
           organizationId: session.organizationId,
           name,
           description: description || null,
-          channel: IntegrationProvider.LINE,
+          channel: channel,
           targetType: targetType === "BROADCAST" ? CampaignTargetType.BROADCAST : CampaignTargetType.TARGETED,
           segmentId: segmentId ?? null,
           scheduledAt: isDraft ? null : (scheduledAt ? new Date(scheduledAt) : null),

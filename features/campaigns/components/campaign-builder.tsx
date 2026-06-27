@@ -22,6 +22,7 @@ import {
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { IntegrationProvider } from "@prisma/client";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -33,7 +34,7 @@ type MessageBlock = {
 };
 
 type SegmentOption = { id: string; name: string; description?: string | null };
-type LineCustomerOption = { lineUserId: string; customerName: string; handle: string };
+type LineCustomerOption = { lineUserId: string; customerName: string; handle: string; channel: IntegrationProvider };
 
 // ─── Searchable Select ────────────────────────────────────────────────────────
 function SearchableSelect<T>({
@@ -287,6 +288,7 @@ export function CampaignBuilder({ campaignId }: CampaignBuilderProps) {
   // Form State
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [channel, setChannel] = useState<IntegrationProvider>("LINE");
   const [targetType, setTargetType] = useState<"BROADCAST" | "TARGETED">("BROADCAST");
 
   // Segment picker
@@ -302,6 +304,7 @@ export function CampaignBuilder({ campaignId }: CampaignBuilderProps) {
   // LINE customer picker (Test step)
   const [testUserId, setTestUserId] = useState("");
   const [testUserDisplay, setTestUserDisplay] = useState("");
+  const [testUserChannel, setTestUserChannel] = useState<IntegrationProvider>("LINE");
   const [lineCustomers, setLineCustomers] = useState<LineCustomerOption[]>([]);
   const [lineCustomersLoading, setLineCustomersLoading] = useState(false);
   const [lineCustomerSearch, setLineCustomerSearch] = useState("");
@@ -329,6 +332,7 @@ export function CampaignBuilder({ campaignId }: CampaignBuilderProps) {
 
         setName(data.name || "");
         setDescription(data.description || "");
+        setChannel(data.channel || "LINE");
         setTargetType(data.targetType || "BROADCAST");
         setSegmentId(data.segmentId || "");
         if (data.segment) {
@@ -390,12 +394,12 @@ export function CampaignBuilder({ campaignId }: CampaignBuilderProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetType, segmentSearch]);
 
-  // Load LINE customers when on step 4
+  // Load channel customers when on step 4
   useEffect(() => {
     if (step !== 4) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLineCustomersLoading(true);
-    fetch(`/api/campaigns/line-customers?search=${encodeURIComponent(lineCustomerSearch)}`)
+    fetch(`/api/campaigns/line-customers?channel=ALL&search=${encodeURIComponent(lineCustomerSearch)}`)
       .then((r) => r.json())
       // eslint-disable-next-line react-hooks/set-state-in-effect
       .then((data) => setLineCustomers(Array.isArray(data) ? data : []))
@@ -428,7 +432,7 @@ export function CampaignBuilder({ campaignId }: CampaignBuilderProps) {
 
   const handleSendTest = async () => {
     if (!testUserId.trim()) {
-      setTestResult({ success: false, message: "กรุณาเลือกลูกค้าที่มี LINE ก่อนส่งทดสอบ" });
+      setTestResult({ success: false, message: `กรุณาเลือกลูกค้าที่มี ${testUserChannel} ก่อนส่งทดสอบ` });
       return;
     }
     setIsSendingTest(true);
@@ -437,13 +441,13 @@ export function CampaignBuilder({ campaignId }: CampaignBuilderProps) {
       const res = await fetch("/api/campaigns/test-send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lineUserId: testUserId, messages }),
+        body: JSON.stringify({ lineUserId: testUserId, messages, channel: testUserChannel }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? "ส่งข้อความทดสอบไม่สำเร็จ");
       }
-      setTestResult({ success: true, message: `ส่งสำเร็จไปยัง ${testUserDisplay}! กรุณาตรวจสอบ LINE` });
+      setTestResult({ success: true, message: `ส่งสำเร็จไปยัง ${testUserDisplay}! กรุณาตรวจสอบ ${testUserChannel}` });
     } catch (err: unknown) {
       setTestResult({ success: false, message: (err as Error).message });
     } finally {
@@ -469,7 +473,7 @@ export function CampaignBuilder({ campaignId }: CampaignBuilderProps) {
         body: JSON.stringify({
           name,
           description,
-          channel: "LINE",
+          channel,
           targetType,
           segmentId: targetType === "TARGETED" ? segmentId : null,
           scheduledAt: forceAsDraft || isImmediate ? null : new Date(scheduledAt).toISOString(),
@@ -550,6 +554,7 @@ export function CampaignBuilder({ campaignId }: CampaignBuilderProps) {
                 </label>
                 <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="เช่น Flash Sale มิถุนายน 2026" />
               </div>
+
               <div className="space-y-1.5">
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">{t("description")}</label>
                 <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="คำอธิบายเพิ่มเติม (ไม่บังคับ)" />
@@ -673,14 +678,14 @@ export function CampaignBuilder({ campaignId }: CampaignBuilderProps) {
           <div className="space-y-5">
             <h2 className="text-base font-semibold text-slate-900 dark:text-white">{t("stepTest")}</h2>
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800/50 dark:bg-amber-950/20 dark:text-amber-300">
-              ⚠️ ข้อความทดสอบจะถูกส่งจริงไปยัง LINE ของลูกค้าที่เลือก
+              ⚠️ ข้อความทดสอบจะถูกส่งจริงไปยังช่องทาง (LINE/Facebook/Instagram) ของลูกค้าที่เลือก
             </div>
             <div className="space-y-3">
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                {t("testUserId")} <span className="text-red-500">*</span>
+                ลูกค้าผู้รับข้อความทดสอบ {testUserId ? `(${testUserChannel})` : ""} <span className="text-red-500">*</span>
               </label>
               <SearchableSelect<LineCustomerOption>
-                placeholder="ค้นหาลูกค้าที่มี LINE..."
+                placeholder="ค้นหาลูกค้าที่มี LINE, Facebook หรือ Instagram..."
                 value={testUserId}
                 displayValue={testUserDisplay}
                 items={lineCustomers}
@@ -689,18 +694,19 @@ export function CampaignBuilder({ campaignId }: CampaignBuilderProps) {
                 onSearchChange={setLineCustomerSearch}
                 onSelect={(c) => {
                   setTestUserId(c.lineUserId);
-                  setTestUserDisplay(`${c.customerName} (${c.lineUserId.substring(0, 12)}...)`);
+                  setTestUserChannel(c.channel);
+                  setTestUserDisplay(`${c.customerName} (${c.channel})`);
                   setTestResult(null);
                 }}
                 renderItem={(c) => ({
                   key: c.lineUserId,
-                  label: c.customerName,
+                  label: `${c.customerName} (${c.channel})`,
                   sub: c.lineUserId,
                 })}
-                emptyText="ไม่พบลูกค้าที่มี LINE ID"
+                emptyText="ไม่พบลูกค้าที่มี ID ช่องทางใดๆ"
               />
               {testUserId && (
-                <p className="text-xs text-slate-500 font-mono break-all">LINE ID: {testUserId}</p>
+                <p className="text-xs text-slate-500 font-mono break-all">{testUserChannel} ID: {testUserId}</p>
               )}
               <Button onClick={handleSendTest} disabled={isSendingTest || !testUserId}>
                 {isSendingTest ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />กำลังส่ง...</> : <><Send className="mr-2 h-4 w-4" />{t("sendTest")}</>}

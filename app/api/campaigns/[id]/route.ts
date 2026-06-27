@@ -8,7 +8,7 @@ import { z } from "zod";
 const UpdateCampaignSchema = z.object({
   name: z.string().min(1, "Name is required").max(150),
   description: z.string().max(500).optional(),
-  channel: z.literal("LINE"),
+  channel: z.nativeEnum(IntegrationProvider).default(IntegrationProvider.LINE),
   targetType: z.enum(["BROADCAST", "TARGETED"]),
   segmentId: z.string().uuid().nullish(),
   scheduledAt: z.string().datetime().nullish(),
@@ -99,7 +99,7 @@ export async function PUT(
       );
     }
 
-    const { name, description, targetType, segmentId, scheduledAt, isDraft, messages } = parsed.data;
+    const { name, description, channel, targetType, segmentId, scheduledAt, isDraft, messages } = parsed.data;
 
     if (targetType === "TARGETED" && !segmentId) {
       return NextResponse.json(
@@ -124,7 +124,7 @@ export async function PUT(
         data: {
           name,
           description: description || null,
-          channel: IntegrationProvider.LINE,
+          channel: channel,
           targetType: targetType === "BROADCAST" ? CampaignTargetType.BROADCAST : CampaignTargetType.TARGETED,
           segmentId: segmentId ?? null,
           scheduledAt: isDraft ? null : (scheduledAt ? new Date(scheduledAt) : null),

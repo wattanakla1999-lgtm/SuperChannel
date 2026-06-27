@@ -4,7 +4,7 @@ import { prisma } from "@/server/database/prisma";
 import { pushLineMulticastMessage } from "@/server/integrations/line-client";
 import { getIntegrationCredentials } from "@/server/repositories/integration-repository";
 import { decryptCredentialPayload } from "@/server/security/encryption";
-import { Campaign, CampaignMessage, Prisma, Segment } from "@prisma/client";
+import { Campaign, CampaignMessage, Prisma, Segment, ChannelType, MessageType } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 
 export type CampaignSendStats = { sent: number; skipped: number; failed: number };
@@ -46,14 +46,11 @@ export async function processCampaign(campaign: Campaign & { messages: CampaignM
       stats AS (
         SELECT 
           c.id as customer_id,
-          (
-            SELECT external_id FROM customer_channel_identities i 
-            WHERE i.customer_id = c.id AND i.channel = 'line'
-            LIMIT 1
-          ) as line_user_id,
+          i.external_id as target_user_id,
           c.marketing_consent_status != 'opted_out' as has_consent
         FROM customers c
         INNER JOIN audience a ON c.id = a.id
+        LEFT JOIN customer_channel_identities i ON i.customer_id = c.id AND i.channel::text IN ('line', 'facebook', 'instagram')
         WHERE c.organization_id = ${campaign.organizationId}::uuid
       )
       INSERT INTO campaign_recipients (
@@ -63,14 +60,14 @@ export async function processCampaign(campaign: Campaign & { messages: CampaignM
         ${campaign.organizationId}::uuid,
         ${campaign.id}::uuid,
         customer_id,
-        COALESCE(line_user_id, ''),
+        COALESCE(target_user_id, ''),
         CASE 
-          WHEN line_user_id IS NULL THEN 'SKIPPED'::campaign_recipient_status
+          WHEN target_user_id IS NULL THEN 'SKIPPED'::campaign_recipient_status
           WHEN NOT has_consent THEN 'SKIPPED'::campaign_recipient_status
           ELSE 'PENDING'::campaign_recipient_status
         END,
         CASE 
-          WHEN line_user_id IS NULL THEN 'No LINE ID'
+          WHEN target_user_id IS NULL THEN 'No connected channel identity (LINE/Facebook/Instagram)'
           WHEN NOT has_consent THEN 'No Marketing Consent (opted out)'
           ELSE NULL
         END,
@@ -111,56 +108,199 @@ export async function processCampaign(campaign: Campaign & { messages: CampaignM
         data: { batchId: batch.id },
       });
 
-      const lineMessages = campaign.messages.map((msg: CampaignMessage) => {
-        if (msg.type === "TEXT") {
-          return { type: "text", text: msg.textContent };
-        } else if (msg.type === "IMAGE") {
-          return { type: "image", originalContentUrl: msg.imageUrl, previewImageUrl: msg.previewImageUrl };
-        }
-        return null;
-      }).filter((m): m is NonNullable<typeof m> => m !== null) as Record<string, unknown>[];
+      const successfullySentRecipients: typeof pendingRecipients = [];
 
-      try {
-        const userIds = pendingRecipients.map(r => r.lineUserId);
-        console.info(`[CAMPAIGN] Sending batch ${batch.id} to ${userIds.length} recipients (campaign ${campaign.id})`);
-        // Try to load integration credentials for the campaign's integration (if set)
-        let overrideCreds: { apiBaseUrl?: string; channelAccessToken?: string; channelSecret?: string } | undefined;
-        if (campaign.integrationId) {
-          const creds = await getIntegrationCredentials(campaign.organizationId, campaign.integrationId);
-          if (creds) {
-            try {
-              const decrypted = decryptCredentialPayload({
-                ciphertext: creds.encryptedPayload,
-                iv: creds.iv,
-                authTag: creds.authTag,
-                keyVersion: (creds as any).keyVersion ?? 1,
-              }) as { channelAccessToken?: string; channelSecret?: string; apiBaseUrl?: string };
-              overrideCreds = {
-                apiBaseUrl: decrypted.apiBaseUrl,
-                channelAccessToken: decrypted.channelAccessToken,
-                channelSecret: decrypted.channelSecret,
-              };
-            } catch (e) {
-              console.warn(`[CAMPAIGN] Failed to decrypt integration credentials for integration ${campaign.integrationId}`, e);
+      // Query identities of the pending recipients to determine their channel type
+      const userIds = pendingRecipients.map(r => r.lineUserId);
+      const identities = await prisma.customerChannelIdentity.findMany({
+        where: {
+          customerId: { in: pendingRecipients.map(r => r.customerId) },
+          externalId: { in: userIds },
+        },
+      });
+
+      const channelMap = new Map<string, string>(); // externalId -> channel
+      for (const ident of identities) {
+        channelMap.set(ident.externalId, ident.channel);
+      }
+
+      const lineRecipients = [];
+      const facebookRecipients = [];
+      const instagramRecipients = [];
+
+      for (const r of pendingRecipients) {
+        const channelVal = channelMap.get(r.lineUserId);
+        if (!channelVal) {
+          await prisma.campaignRecipient.update({
+            where: { id: r.id },
+            data: { status: "FAILED", errorReason: "Channel identity not found or disconnected" },
+          });
+          continue;
+        }
+        if (channelVal === "LINE") {
+          lineRecipients.push(r);
+        } else if (channelVal === "FACEBOOK") {
+          facebookRecipients.push(r);
+        } else if (channelVal === "INSTAGRAM") {
+          instagramRecipients.push(r);
+        }
+      }
+
+      // 1. LINE Multicast Delivery
+      if (lineRecipients.length > 0) {
+        const lineMessages = campaign.messages.map((msg: CampaignMessage) => {
+          if (msg.type === "TEXT") {
+            return { type: "text", text: msg.textContent };
+          } else if (msg.type === "IMAGE") {
+            return { type: "image", originalContentUrl: msg.imageUrl, previewImageUrl: msg.previewImageUrl };
+          }
+          return null;
+        }).filter((m): m is NonNullable<typeof m> => m !== null) as Record<string, unknown>[];
+
+        try {
+          const lineUserIds = lineRecipients.map(r => r.lineUserId);
+          console.info(`[CAMPAIGN] Sending LINE multicast to ${lineUserIds.length} recipients (campaign ${campaign.id})`);
+          let overrideCreds: { apiBaseUrl?: string; channelAccessToken?: string; channelSecret?: string } | undefined;
+          if (campaign.integrationId) {
+            const creds = await getIntegrationCredentials(campaign.organizationId, campaign.integrationId);
+            if (creds) {
+              try {
+                const decrypted = decryptCredentialPayload({
+                  ciphertext: creds.encryptedPayload,
+                  iv: creds.iv,
+                  authTag: creds.authTag,
+                  keyVersion: ((creds as unknown) as { keyVersion?: number }).keyVersion ?? 1,
+                }) as { channelAccessToken?: string; channelSecret?: string; apiBaseUrl?: string };
+                overrideCreds = {
+                  apiBaseUrl: decrypted.apiBaseUrl,
+                  channelAccessToken: decrypted.channelAccessToken,
+                  channelSecret: decrypted.channelSecret,
+                };
+              } catch (e) {
+                console.warn(`[CAMPAIGN] Failed to decrypt LINE credentials for integration ${campaign.integrationId}`, e);
+              }
             }
           }
+
+          await pushLineMulticastMessage(lineUserIds, lineMessages, idempotencyKey, overrideCreds);
+
+          await prisma.campaignRecipient.updateMany({
+            where: { id: { in: lineRecipients.map((r) => r.id) } },
+            data: { status: "SENT" },
+          });
+
+          successfullySentRecipients.push(...lineRecipients);
+        } catch (error: unknown) {
+          console.error(`[CAMPAIGN] LINE multicast failed for campaign ${campaign.id}:`, error);
+          await prisma.campaignRecipient.updateMany({
+            where: { id: { in: lineRecipients.map((r) => r.id) } },
+            data: { status: "FAILED", errorReason: (error as Error).message },
+          });
         }
+      }
 
-        await pushLineMulticastMessage(userIds, lineMessages, idempotencyKey, overrideCreds);
+      // 2. Meta Campaign Loop Delivery helper
+      const processMetaRecipients = async (metaRecipients: typeof pendingRecipients, channelKey: "FACEBOOK" | "INSTAGRAM") => {
+        if (metaRecipients.length === 0) return;
 
-        await prisma.campaignBatch.update({
-          where: { id: batch.id },
-          data: { status: "COMPLETED" },
-        });
+        try {
+          let integration = null;
+          if (campaign.integrationId) {
+            integration = await prisma.integration.findUnique({
+              where: { id: campaign.integrationId },
+              include: { credentials: true },
+            });
+          } else {
+            integration = await prisma.integration.findFirst({
+              where: {
+                organizationId: campaign.organizationId,
+                provider: channelKey,
+                status: "CONNECTED",
+              },
+              include: {
+                credentials: true,
+              },
+            });
+          }
 
-        await prisma.campaignRecipient.updateMany({
-          where: { id: { in: pendingRecipients.map((r) => r.id) } },
-          data: { status: "SENT" },
-        });
+          if (!integration) {
+            throw new Error(`No connected integration found for ${channelKey}`);
+          }
 
+          const { getDecryptedAccessToken, resolveMetaRecipientExternalId } = await import("@/server/services/meta");
+          const { sendMetaTextMessage, sendMetaImageMessage } = await import("@/server/integrations/meta-client");
+
+          const accessToken = await getDecryptedAccessToken(integration);
+          if (!accessToken) {
+            throw new Error(`Failed to decrypt credentials for integration ${integration.id}`);
+          }
+
+          const metaChannel = channelKey.toLowerCase() as "facebook" | "instagram";
+          console.info(`[CAMPAIGN] Sending to ${metaRecipients.length} recipients via Meta ${channelKey}`);
+
+          for (const recipient of metaRecipients) {
+            const psid = resolveMetaRecipientExternalId(recipient.lineUserId);
+            if (!psid) {
+              await prisma.campaignRecipient.update({
+                where: { id: recipient.id },
+                data: { status: "FAILED", errorReason: `No PSID found for user` },
+              });
+              continue;
+            }
+
+            try {
+              for (const msg of campaign.messages) {
+                if (msg.type === "TEXT") {
+                  await sendMetaTextMessage(psid, metaChannel, msg.textContent || "", accessToken);
+                } else if (msg.type === "IMAGE") {
+                  await sendMetaImageMessage(psid, metaChannel, msg.imageUrl || "", accessToken);
+                }
+              }
+
+              await prisma.campaignRecipient.update({
+                where: { id: recipient.id },
+                data: { status: "SENT" },
+              });
+
+              successfullySentRecipients.push(recipient);
+            } catch (recipientError: unknown) {
+              console.error(`[CAMPAIGN] Failed to send to Meta recipient ${recipient.id}:`, recipientError);
+              await prisma.campaignRecipient.update({
+                where: { id: recipient.id },
+                data: { status: "FAILED", errorReason: (recipientError as Error).message || String(recipientError) },
+              });
+            }
+          }
+        } catch (error: unknown) {
+          console.error(`[CAMPAIGN] Meta ${channelKey} processing failed for campaign ${campaign.id}:`, error);
+          await prisma.campaignRecipient.updateMany({
+            where: { id: { in: metaRecipients.map((r) => r.id) } },
+            data: { status: "FAILED", errorReason: (error as Error).message },
+          });
+        }
+      };
+
+      await processMetaRecipients(facebookRecipients, "FACEBOOK");
+      await processMetaRecipients(instagramRecipients, "INSTAGRAM");
+
+      await prisma.campaignBatch.update({
+        where: { id: batch.id },
+        data: { status: "COMPLETED" },
+      });
+
+      if (successfullySentRecipients.length > 0) {
         // --- RECORD PATH TO CUSTOMER INTEGRATED CHAT DETAILS (INBOX RECENTS) ---
         try {
-          const externalThreadIds = pendingRecipients.map((r) => `line:user:${r.lineUserId}`);
+          const externalThreadIds = successfullySentRecipients.map((r) => {
+            const chan = channelMap.get(r.lineUserId);
+            if (chan === "LINE") {
+              return `line:user:${r.lineUserId}`;
+            } else if (chan === "FACEBOOK") {
+              return `meta:${r.lineUserId}`;
+            } else {
+              return `meta:instagram:${r.lineUserId}`;
+            }
+          });
 
           const existingConversations = await prisma.conversation.findMany({
             where: {
@@ -180,12 +320,18 @@ export async function processCampaign(campaign: Campaign & { messages: CampaignM
           }
 
           // Generate or find conversations for missing ones safely
-          for (const recipient of pendingRecipients) {
+          for (const recipient of successfullySentRecipients) {
             if (conversationMapByCustId.has(recipient.customerId)) {
               continue;
             }
 
-            const extThreadId = `line:user:${recipient.lineUserId}`;
+            const chan = channelMap.get(recipient.lineUserId);
+            const extThreadId = chan === "LINE"
+              ? `line:user:${recipient.lineUserId}`
+              : chan === "FACEBOOK"
+              ? `meta:${recipient.lineUserId}`
+              : `meta:instagram:${recipient.lineUserId}`;
+
             const existing = existingConversations.find((c) => c.externalThreadId === extThreadId);
             if (existing) {
               conversationMapByCustId.set(recipient.customerId, existing.id);
@@ -193,12 +339,13 @@ export async function processCampaign(campaign: Campaign & { messages: CampaignM
             }
 
             try {
-              const convId = `conv-line-${randomUUID()}`;
+              const channelCode = chan ? chan.toLowerCase() : "line";
+              const convId = `conv-${channelCode}-${randomUUID()}`;
               await prisma.conversation.create({
                 data: {
                   id: convId,
                   customerId: recipient.customerId,
-                  channel: "LINE",
+                  channel: chan as unknown as ChannelType,
                   organizationId: campaign.organizationId,
                   status: "OPEN",
                   externalThreadId: extThreadId,
@@ -219,9 +366,12 @@ export async function processCampaign(campaign: Campaign & { messages: CampaignM
 
           // Bulk write messages for all recipients
           const messageDataList: Prisma.ConversationMessageCreateManyInput[] = [];
-          for (const recipient of pendingRecipients) {
+          for (const recipient of successfullySentRecipients) {
             const convId = conversationMapByCustId.get(recipient.customerId);
             if (!convId) continue;
+
+            const chan = channelMap.get(recipient.lineUserId);
+            const channelCode = chan ? chan.toLowerCase() : "line";
 
             for (const msg of campaign.messages) {
               let msgType = "TEXT";
@@ -239,12 +389,12 @@ export async function processCampaign(campaign: Campaign & { messages: CampaignM
                 : msgBody;
 
               messageDataList.push({
-                id: `msg-line-${randomUUID()}`,
+                id: `msg-${channelCode}-${randomUUID()}`,
                 organizationId: campaign.organizationId,
                 conversationId: convId,
                 senderDisplayName: "SuperChannel Admin",
                 direction: "OUTBOUND",
-                type: msgType as any,
+                type: msgType as unknown as MessageType,
                 body: formattedBody,
                 createdAt: new Date(),
               });
@@ -274,17 +424,6 @@ export async function processCampaign(campaign: Campaign & { messages: CampaignM
         } catch (recordError) {
           console.error(`[CAMPAIGN] Failed to write outbound campaign messages history mapping:`, recordError);
         }
-      } catch (error: unknown) {
-        console.error(`[CAMPAIGN] Batch ${batch.id} failed for campaign ${campaign.id}:`, error);
-        await prisma.campaignBatch.update({
-          where: { id: batch.id },
-          data: { status: "FAILED", errorMessage: (error as Error).message },
-        });
-
-        await prisma.campaignRecipient.updateMany({
-          where: { id: { in: pendingRecipients.map((r) => r.id) } },
-          data: { status: "FAILED", errorReason: (error as Error).message },
-        });
       }
     }
 

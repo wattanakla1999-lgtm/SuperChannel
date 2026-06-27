@@ -66,7 +66,7 @@ function buildMetaExternalThreadId(
   return `meta:${channel.toLowerCase()}:${userId}`;
 }
 
-function resolveMetaRecipientExternalId(externalId: string) {
+export function resolveMetaRecipientExternalId(externalId: string) {
   const scopedPsidMarker = ":psid:";
   const psidIndex = externalId.lastIndexOf(scopedPsidMarker);
 
@@ -496,7 +496,7 @@ async function ensureMetaConversationContext(
   }
 }
 
-async function getDecryptedAccessToken(integration: IntegrationWithCredentials) {
+export async function getDecryptedAccessToken(integration: IntegrationWithCredentials) {
   if (integration.credentials) {
     try {
       const decrypted = decryptCredentialPayload({

@@ -168,7 +168,7 @@ export function AuthenticatedShell({
       try {
         const list = await getConversations();
         if (!isMounted) return;
-        const count = list.filter((c: any) => c.unreadCount > 0).length;
+        const count = list.filter((c: { unreadCount: number }) => c.unreadCount > 0).length;
         setUnreadCount(count);
       } catch (err) {
         console.error("Failed to fetch conversations unread count", err);

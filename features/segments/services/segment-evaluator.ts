@@ -32,12 +32,13 @@ export function buildSegmentRawQuery(
       }
       case "channel": {
         const providers = cond.value;
+        const lowerProviders = providers.map(p => p.toLowerCase());
         if (cond.operator === "has_any") {
-          sqlConditions.push(Prisma.sql`EXISTS (SELECT 1 FROM customer_channel_identities WHERE customer_channel_identities.customer_id = customers.id AND customer_channel_identities.channel::text IN (${Prisma.join(providers)}))`);
+          sqlConditions.push(Prisma.sql`EXISTS (SELECT 1 FROM customer_channel_identities WHERE customer_channel_identities.customer_id = customers.id AND customer_channel_identities.channel::text IN (${Prisma.join(lowerProviders)}))`);
         } else if (cond.operator === "has_all") {
-          sqlConditions.push(Prisma.sql`(SELECT COUNT(DISTINCT channel) FROM customer_channel_identities WHERE customer_channel_identities.customer_id = customers.id AND customer_channel_identities.channel::text IN (${Prisma.join(providers)})) = ${providers.length}`);
+          sqlConditions.push(Prisma.sql`(SELECT COUNT(DISTINCT channel) FROM customer_channel_identities WHERE customer_channel_identities.customer_id = customers.id AND customer_channel_identities.channel::text IN (${Prisma.join(lowerProviders)})) = ${providers.length}`);
         } else if (cond.operator === "does_not_have") {
-          sqlConditions.push(Prisma.sql`NOT EXISTS (SELECT 1 FROM customer_channel_identities WHERE customer_channel_identities.customer_id = customers.id AND customer_channel_identities.channel::text IN (${Prisma.join(providers)}))`);
+          sqlConditions.push(Prisma.sql`NOT EXISTS (SELECT 1 FROM customer_channel_identities WHERE customer_channel_identities.customer_id = customers.id AND customer_channel_identities.channel::text IN (${Prisma.join(lowerProviders)}))`);
         }
         break;
       }

@@ -13,10 +13,18 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") ?? "";
 
+    const channelQuery = searchParams.get("channel");
+    let channelFilter: { in: ChannelType[] } | ChannelType = { in: [ChannelType.LINE, ChannelType.FACEBOOK, ChannelType.INSTAGRAM] };
+    if (channelQuery && channelQuery.toUpperCase() !== "ALL") {
+      if (Object.values(ChannelType).includes(channelQuery.toUpperCase() as ChannelType)) {
+        channelFilter = channelQuery.toUpperCase() as ChannelType;
+      }
+    }
+
     const identities = await prisma.customerChannelIdentity.findMany({
       where: {
         organizationId: session.organizationId,
-        channel: ChannelType.LINE,
+        channel: channelFilter,
         ...(search
           ? {
               OR: [
@@ -41,6 +49,7 @@ export async function GET(request: Request) {
         lineUserId: i.externalId,
         customerName: i.customer.name,
         handle: i.handle,
+        channel: i.channel,
       }))
     );
   } catch (error) {

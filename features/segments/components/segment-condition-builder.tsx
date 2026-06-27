@@ -217,15 +217,15 @@ export function SegmentConditionBuilder({ conditions, onChange }: SegmentConditi
   };
 
   const channelOptions = [
-    { label: "LINE", value: "line" },
-    { label: "Facebook", value: "facebook" },
-    { label: "Instagram", value: "instagram" },
-    { label: "Telegram", value: "telegram" },
-    { label: "X", value: "x" },
-    { label: "TikTok", value: "tiktok" },
-    { label: "Shopee", value: "shopee" },
-    { label: "Lazada", value: "lazada" },
-    { label: "TikTok Shop", value: "tiktok_shop" },
+    { label: "LINE", value: "LINE" },
+    { label: "Facebook", value: "FACEBOOK" },
+    { label: "Instagram", value: "INSTAGRAM" },
+    { label: "Telegram", value: "TELEGRAM" },
+    { label: "X", value: "X" },
+    { label: "TikTok", value: "TIKTOK" },
+    { label: "Shopee", value: "SHOPEE" },
+    { label: "Lazada", value: "LAZADA" },
+    { label: "TikTok Shop", value: "TIKTOK_SHOP" },
   ];
 
   const conversationStatusOptions = [
