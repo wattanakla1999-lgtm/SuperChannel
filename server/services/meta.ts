@@ -865,15 +865,18 @@ function getFacebookIgnoredReason(payload: MetaWebhookBody, event: MetaMessaging
     return "postback_event";
   }
 
-  if (!event.message?.text?.trim()) {
-    return "missing_message_text";
+  const hasText = Boolean(event.message?.text?.trim());
+  const hasAttachment = Boolean(event.message?.attachments?.length);
+
+  if (!hasText && !hasAttachment) {
+    return "missing_message_content";
   }
 
   if (!event.sender?.id) {
     return "missing_sender_id";
   }
 
-  if (!event.message.mid) {
+  if (!event.message?.mid) {
     return "missing_message_id";
   }
 
@@ -922,11 +925,12 @@ export async function processFacebookMessengerWebhookPayload(payload: MetaWebhoo
         continue;
       }
 
-      const text = event.message?.text?.trim();
       const senderPsid = event.sender?.id;
       const externalMessageId = event.message?.mid;
+      const hasText = Boolean(event.message?.text?.trim());
+      const hasAttachment = Boolean(event.message?.attachments?.length);
 
-      if (!text || !senderPsid || !externalMessageId) {
+      if ((!hasText && !hasAttachment) || !senderPsid || !externalMessageId) {
         ignored += 1;
         continue;
       }
@@ -997,7 +1001,7 @@ export async function processFacebookMessengerWebhookPayload(payload: MetaWebhoo
           event,
           occurredAt,
           {
-            body: text,
+            body: event.message?.text?.trim(),
             pageId,
           },
         );

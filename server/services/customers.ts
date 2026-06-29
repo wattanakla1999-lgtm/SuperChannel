@@ -10,8 +10,9 @@ import type { ConversationDetail, ConversationSummary } from "@/features/inbox/t
 import type { AuthenticatedSession } from "@/server/auth/session";
 import { prisma } from "@/server/database/prisma";
 import { fetchLineProfile } from "@/server/integrations/line-client";
+import { fetchMetaProfile } from "@/server/integrations/meta-client";
 import { getLineAttachmentContent, sendLineImageReplyFromInbox, sendLineReplyFromInbox } from "@/server/services/line";
-import { sendMetaImageReplyFromInbox, sendMetaReplyFromInbox } from "@/server/services/meta";
+import { getDecryptedAccessToken, sendMetaImageReplyFromInbox, sendMetaReplyFromInbox } from "@/server/services/meta";
 import { createSignedAttachmentUrl, downloadStoredAttachment, uploadConversationImage } from "@/server/storage/message-attachments";
 import type { ChannelType, ConversationStatus, Prisma } from "@prisma/client";
 
@@ -26,6 +27,22 @@ const inboxChannelLabels = {
   LAZADA: "Lazada",
   TIKTOK_SHOP: "TikTok Shop",
 } as const;
+
+const PROFILE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const inFlightMetaProfileSyncs = new Map<string, Promise<string | null>>();
+
+function findMetaIdentity(identities: Array<{ channel: ChannelType; externalId: string }>) {
+  return identities.find(
+    (identity) => identity.channel === "FACEBOOK" || identity.channel === "INSTAGRAM",
+  );
+}
+
+function buildMetaAvatarProxyUrl(customerId: string, profileUpdatedAt?: Date | null) {
+  const version = profileUpdatedAt?.getTime();
+  return version
+    ? `/api/customers/${encodeURIComponent(customerId)}/avatar?v=${version}`
+    : `/api/customers/${encodeURIComponent(customerId)}/avatar`;
+}
 
 function toStatusLabel(status: "OPEN" | "PENDING" | "RESOLVED") {
   return status.toLowerCase() as "open" | "pending" | "resolved";
@@ -90,10 +107,35 @@ function readSupabaseStoragePath(storagePath: string | null) {
   return storagePath.slice("supabase:".length);
 }
 
+async function syncLineProfileCache(
+  customerId: string,
+  lineUserId: string,
+) {
+  try {
+    const profile = await fetchLineProfile(lineUserId);
+    const pictureUrl = profile.pictureUrl ?? null;
+
+    await prisma.customer.update({
+      data: {
+        avatarUrl: pictureUrl,
+        profileUpdatedAt: new Date(),
+      },
+      where: {
+        id: customerId,
+      },
+    });
+  } catch (e) {
+    console.error("[LINE_PROFILE_CACHE] Failed to sync profile cache in DB", e);
+  }
+}
+
 async function resolveAvatarImageUrl(
   customer: {
     id: string;
     avatarUrl?: string | null;
+    avatarFallback?: string | null;
+    name?: string;
+    organizationId?: string;
     profileUpdatedAt?: Date | null;
     channelIdentities: Array<{ channel: ChannelType; externalId: string }>;
   }
@@ -104,41 +146,222 @@ async function resolveAvatarImageUrl(
     const isCacheValid =
       customer.avatarUrl &&
       customer.profileUpdatedAt &&
-      (now.getTime() - customer.profileUpdatedAt.getTime()) < 24 * 60 * 60 * 1000;
+      (now.getTime() - customer.profileUpdatedAt.getTime()) < PROFILE_CACHE_TTL_MS;
 
-    if (isCacheValid) {
-      return customer.avatarUrl;
+    if (!isCacheValid) {
+      void syncLineProfileCache(customer.id, lineIdentity.externalId);
     }
 
-    try {
-      const profile = await fetchLineProfile(lineIdentity.externalId);
-      const pictureUrl = profile.pictureUrl ?? null;
+    return customer.avatarUrl ?? null;
+  }
 
-      // Update database cache in the background (avoid blocking API response)
-      prisma.customer.update({
+  const metaIdentity = findMetaIdentity(customer.channelIdentities);
+  if (metaIdentity) {
+    if (!customer.avatarUrl) {
+      void syncMetaProfileCache(customer, metaIdentity);
+    }
+
+    return buildMetaAvatarProxyUrl(customer.id, customer.profileUpdatedAt);
+  }
+
+  return null;
+}
+
+function parseMetaIdentity(identity: { channel: ChannelType; externalId: string }) {
+  const scopedMarker = ":psid:";
+
+  if (identity.channel === "FACEBOOK" && identity.externalId.startsWith("facebook:page:")) {
+    const scopedIndex = identity.externalId.lastIndexOf(scopedMarker);
+
+    if (scopedIndex > 0) {
+      return {
+        userId: identity.externalId.slice(scopedIndex + scopedMarker.length),
+      };
+    }
+  }
+
+  return {
+    userId: identity.externalId,
+  };
+}
+
+async function syncMetaProfileCache(
+  customer: {
+    id: string;
+    avatarFallback?: string | null;
+    avatarUrl?: string | null;
+    name?: string;
+    organizationId?: string;
+  },
+  identity: { channel: ChannelType; externalId: string },
+) {
+  if ((identity.channel !== "FACEBOOK" && identity.channel !== "INSTAGRAM") || !customer.organizationId) {
+    return customer.avatarUrl ?? null;
+  }
+
+  const { userId } = parseMetaIdentity(identity);
+  const syncKey = `${customer.id}:${identity.channel}:${userId}`;
+  const existingSync = inFlightMetaProfileSyncs.get(syncKey);
+
+  if (existingSync) {
+    return existingSync;
+  }
+
+  const syncPromise = (async () => {
+    try {
+      const integration = await prisma.integration.findFirst({
+        include: {
+          credentials: true,
+        },
+        where: {
+          organizationId: customer.organizationId,
+          provider: identity.channel,
+          status: "CONNECTED",
+        },
+      });
+
+      if (!integration) {
+        return customer.avatarUrl ?? null;
+      }
+
+      const accessToken = await getDecryptedAccessToken(integration);
+      const profile = await fetchMetaProfile(
+        userId,
+        identity.channel.toLowerCase() as "facebook" | "instagram",
+        accessToken,
+      );
+      const nextName = profile.name?.trim() || customer.name?.trim() || "Unknown Customer";
+      const nextAvatarUrl = profile.pictureUrl ?? null;
+
+      await prisma.customer.update({
         data: {
-          avatarUrl: pictureUrl,
+          avatarFallback: nextName.slice(0, 2).toUpperCase(),
+          avatarUrl: nextAvatarUrl,
+          name: nextName,
           profileUpdatedAt: new Date(),
         },
         where: {
           id: customer.id,
         },
-      }).catch((e) => console.error("[LINE_PROFILE_CACHE] Failed to update profile cache in DB", e));
+      });
 
-      return pictureUrl;
-    } catch {
+      return nextAvatarUrl;
+    } catch (error) {
+      console.error("[META_PROFILE_CACHE] Failed to sync profile cache", {
+        channel: identity.channel,
+        customerId: customer.id,
+        error,
+      });
       return customer.avatarUrl ?? null;
+    } finally {
+      inFlightMetaProfileSyncs.delete(syncKey);
+    }
+  })();
+
+  inFlightMetaProfileSyncs.set(syncKey, syncPromise);
+  return syncPromise;
+}
+
+function buildAvatarPlaceholderSvg(label: string) {
+  const safeLabel = label.slice(0, 2).toUpperCase();
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" role="img" aria-label="${safeLabel}"><rect width="160" height="160" rx="80" fill="#0f172a"/><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="52" font-weight="700">${safeLabel}</text></svg>`;
+}
+
+async function fetchImageContent(url: string) {
+  const response = await fetch(url, {
+    headers: {
+      Accept: "image/*",
+    },
+    method: "GET",
+    redirect: "follow",
+  });
+  const contentType = response.headers.get("content-type") ?? "";
+
+  if (!response.ok || !contentType.startsWith("image/")) {
+    return null;
+  }
+
+  return {
+    body: Buffer.from(await response.arrayBuffer()),
+    contentType,
+  };
+}
+
+async function fetchMetaGraphAvatarContent(userId: string, accessToken: string) {
+  if (accessToken.startsWith("mock-")) {
+    return null;
+  }
+
+  const apiBaseUrl = process.env.META_API_BASE_URL ?? "https://graph.facebook.com";
+  const url = new URL(`/v19.0/${encodeURIComponent(userId)}/picture`, apiBaseUrl.replace(/\/$/, ""));
+  url.searchParams.set("access_token", accessToken);
+  url.searchParams.set("height", "1024");
+  url.searchParams.set("width", "1024");
+
+  return fetchImageContent(url.toString());
+}
+
+export async function getCustomerAvatarContent(
+  session: AuthenticatedSession,
+  customerId: string,
+) {
+  const customer = await prisma.customer.findFirst({
+    include: {
+      channelIdentities: true,
+    },
+    where: {
+      id: customerId,
+      organizationId: session.organizationId,
+    },
+  });
+
+  if (!customer) {
+    return null;
+  }
+
+  const metaIdentity = findMetaIdentity(customer.channelIdentities);
+
+  if (!metaIdentity) {
+    return null;
+  }
+
+  const { userId } = parseMetaIdentity(metaIdentity);
+  const integration = await prisma.integration.findFirst({
+    include: {
+      credentials: true,
+    },
+    where: {
+      organizationId: session.organizationId,
+      provider: metaIdentity.channel,
+      status: "CONNECTED",
+    },
+  });
+
+  if (integration) {
+    const accessToken = await getDecryptedAccessToken(integration);
+    const graphAvatar = await fetchMetaGraphAvatarContent(userId, accessToken).catch(() => null);
+
+    if (graphAvatar) {
+      return graphAvatar;
     }
   }
 
-  const metaIdentity = customer.channelIdentities.find(
-    (identity) => identity.channel === "FACEBOOK" || identity.channel === "INSTAGRAM"
-  );
-  if (metaIdentity) {
-    return customer.avatarUrl ?? null;
+  if (!customer.avatarUrl) {
+    await syncMetaProfileCache(customer, metaIdentity);
   }
 
-  return null;
+  if (customer.avatarUrl && !customer.avatarUrl.includes("example.invalid")) {
+    const cachedAvatar = await fetchImageContent(customer.avatarUrl).catch(() => null);
+
+    if (cachedAvatar) {
+      return cachedAvatar;
+    }
+  }
+
+  return {
+    body: Buffer.from(buildAvatarPlaceholderSvg(customer.avatarFallback ?? customer.name)),
+    contentType: "image/svg+xml",
+  };
 }
 
 function toCustomerSummary(customer: {

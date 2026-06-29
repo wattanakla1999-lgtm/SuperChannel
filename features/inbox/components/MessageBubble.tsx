@@ -13,6 +13,7 @@ type MessageBubbleProps = {
   message: ConversationMessage;
   customerAvatarUrl?: string | null;
   customerAvatarFallback?: string;
+  isLatestOutbound?: boolean;
 };
 
 function isPlaceholder(message: ConversationMessage) {
@@ -32,12 +33,21 @@ function getInitials(name: string) {
     .join("") || "SC";
 }
 
-export default function MessageBubble({ isFirstOfDay = false, message, customerAvatarUrl, customerAvatarFallback }: MessageBubbleProps) {
+export default function MessageBubble({
+  isFirstOfDay = false,
+  message,
+  customerAvatarUrl,
+  customerAvatarFallback,
+  isLatestOutbound = false,
+}: MessageBubbleProps) {
   const format = useFormatter();
   const t = useTranslations("inbox");
   const isOutbound = message.direction === "outbound";
   const shouldShowCaption = Boolean(message.body) && !isPlaceholder(message);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  const isTemp = message.id.startsWith("temp-");
+  const shouldShowStatus = isOutbound && (isTemp || isLatestOutbound);
 
   return (
     <>
@@ -76,7 +86,7 @@ export default function MessageBubble({ isFirstOfDay = false, message, customerA
 
         <div className={classNames("flex flex-col max-w-[78%] sm:max-w-[70%]", isOutbound ? "order-1 items-end" : "items-start")}>
           <div className={classNames("mb-1 flex items-center gap-2 px-1 text-[11px] text-slate-400 dark:text-slate-500", isOutbound && "justify-end")}>
-            <span className="truncate">{message.senderName}</span>
+            {message.senderName ? <span className="truncate">{message.senderName}</span> : null}
             <span>
               {format.dateTime(new Date(message.createdAt), {
                 day: "numeric",
@@ -86,6 +96,14 @@ export default function MessageBubble({ isFirstOfDay = false, message, customerA
                 timeZone: "Asia/Bangkok",
               })}
             </span>
+            {shouldShowStatus && (
+              <span className={classNames(
+                "ml-1 font-semibold",
+                isTemp ? "text-slate-400 animate-pulse" : "text-emerald-500 dark:text-emerald-400"
+              )}>
+                • {isTemp ? "กำลังส่ง..." : "ส่งแล้ว"}
+              </span>
+            )}
           </div>
 
           {message.type === "image" || message.type === "sticker" ? (

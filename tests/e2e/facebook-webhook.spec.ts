@@ -156,15 +156,15 @@ test.describe("facebook webhook", () => {
     expect(firstResponse.status()).toBe(200);
     await expect(firstResponse.json()).resolves.toMatchObject({
       duplicates: 0,
-      ignored: 2,
-      processed: 1,
+      ignored: 1,
+      processed: 2,
     });
 
     const duplicateResponse = await postFacebookWebhook(request, payload);
     expect(duplicateResponse.status()).toBe(200);
     await expect(duplicateResponse.json()).resolves.toMatchObject({
-      duplicates: 1,
-      ignored: 2,
+      duplicates: 2,
+      ignored: 1,
       processed: 0,
     });
 
@@ -181,6 +181,7 @@ test.describe("facebook webhook", () => {
     const conversations = (await conversationsResponse.json()) as {
       conversations: Array<{
         channel: string;
+        customerId: string;
         id: string;
         preview: string;
         unreadCount: number;
@@ -194,9 +195,11 @@ test.describe("facebook webhook", () => {
     );
 
     expect(matchingConversations).toHaveLength(1);
-    expect(matchingConversations[0].unreadCount).toBe(2);
+    expect(matchingConversations[0].unreadCount).toBe(3);
     expect(matchingConversations[0].customerName).toBe("Marco Rivera");
-    expect(matchingConversations[0].customerAvatarImageUrl).toBe("https://example.invalid/fb/marco.jpg");
+    expect(matchingConversations[0].customerAvatarImageUrl).toContain(
+      `/api/customers/${encodeURIComponent(matchingConversations[0].customerId)}/avatar`,
+    );
 
     const detailResponse = await page.request.get(
       `/api/inbox/conversations/${matchingConversations[0].id}`,
@@ -214,8 +217,20 @@ test.describe("facebook webhook", () => {
       firstTextBody,
       secondTextBody,
     ]);
+    expect(
+      detail.messages.some(
+        (message: { body: string; direction: string; type: string }) =>
+          message.direction === "inbound" &&
+          message.type === "image" &&
+          message.body === "Sent an image",
+      ),
+    ).toBe(true);
     expect(detail.conversation.preview).toBe(secondTextBody);
     expect(detail.customer.name).toBe("Marco Rivera");
-    expect(detail.customer.avatarImageUrl).toBe("https://example.invalid/fb/marco.jpg");
+    expect(detail.customer.avatarImageUrl).toContain("/api/customers/");
+
+    const avatarResponse = await page.request.get(detail.customer.avatarImageUrl);
+    expect(avatarResponse.status()).toBe(200);
+    expect(avatarResponse.headers()["content-type"]).toContain("image/");
   });
 });

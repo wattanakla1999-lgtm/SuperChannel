@@ -31,8 +31,12 @@ function isMockMode(apiBaseUrl: string, accessToken?: string): boolean {
     apiBaseUrl.startsWith("mock://") ||
     process.env.NODE_ENV === "test" ||
     process.env.PLAYWRIGHT_TEST === "true" ||
-    (accessToken != null && accessToken.startsWith("mock-token-"))
+    (accessToken != null && accessToken.startsWith("mock-"))
   );
+}
+
+function isMockProfileId(psid: string) {
+  return psid.startsWith("fb-psid-") || psid.startsWith("ig-psid-");
 }
 
 export function verifyMetaSignature(rawBody: string, signature: string | null): boolean {
@@ -53,6 +57,35 @@ export function verifyMetaSignature(rawBody: string, signature: string | null): 
   return provided.length === actual.length && timingSafeEqual(provided, actual);
 }
 
+function isMetaPermissionError(response: Response, errorText: string) {
+  return (
+    response.status === 401 ||
+    response.status === 403 ||
+    errorText.includes('"code":190') ||
+    errorText.includes("pages_messaging") ||
+    errorText.includes("pages_manage_metadata") ||
+    errorText.includes("permission(s) must be granted")
+  );
+}
+
+function createMetaApiError(
+  response: Response,
+  errorText: string,
+  action: "load profile" | "send message",
+) {
+  if (isMetaPermissionError(response, errorText)) {
+    const error = new Error(
+      `Facebook Page access token cannot ${action}. Reconnect Facebook with pages_messaging and pages_manage_metadata permissions, then try again.`,
+    );
+    error.name = "FORBIDDEN";
+    return error;
+  }
+
+  const error = new Error(`Meta API error: ${errorText || response.statusText}`);
+  error.name = "BAD_GATEWAY";
+  return error;
+}
+
 export async function fetchMetaProfile(
   psid: string,
   channel: "facebook" | "instagram",
@@ -65,7 +98,7 @@ export async function fetchMetaProfile(
 
   const { apiBaseUrl } = getMetaConfig();
 
-  if (isMockMode(apiBaseUrl, accessToken)) {
+  if (isMockMode(apiBaseUrl, accessToken) || isMockProfileId(psid)) {
     const profile: MetaProfile = channel === "facebook"
       ? {
           id: psid,
@@ -97,9 +130,7 @@ export async function fetchMetaProfile(
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => "");
-    const error = new Error(`Meta API error: ${errorText || response.statusText}`);
-    error.name = response.status === 401 || response.status === 403 ? "FORBIDDEN" : "BAD_GATEWAY";
-    throw error;
+    throw createMetaApiError(response, errorText, "load profile");
   }
 
   const data = await response.json();
@@ -151,9 +182,7 @@ export async function sendMetaTextMessage(
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => "");
-    const error = new Error(`Meta API send error: ${errorText || response.statusText}`);
-    error.name = response.status === 401 || response.status === 403 ? "FORBIDDEN" : "BAD_GATEWAY";
-    throw error;
+    throw createMetaApiError(response, errorText, "send message");
   }
 
   const data = await response.json();
@@ -194,9 +223,7 @@ export async function sendMetaImageMessage(
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => "");
-    const error = new Error(`Meta API send error: ${errorText || response.statusText}`);
-    error.name = response.status === 401 || response.status === 403 ? "FORBIDDEN" : "BAD_GATEWAY";
-    throw error;
+    throw createMetaApiError(response, errorText, "send message");
   }
 
   const data = await response.json();

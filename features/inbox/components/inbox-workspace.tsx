@@ -47,6 +47,7 @@ import {
   RIGHT_PANEL_MAX,
   RIGHT_PANEL_MIN,
   type ConversationDetail,
+  type ConversationMessage,
   type ConversationStatus,
   type ConversationSummary,
   type InboxChannel,
@@ -57,15 +58,10 @@ import MessageBubble from "./MessageBubble";
 import PanelResizeDivider from "./PanelResizeDivider";
 
 const filters: ConversationStatus[] = ["all", "unread", "open", "pending", "resolved"];
-const LIST_POLL_INTERVAL_MS = 4_000;
-const DETAIL_POLL_INTERVAL_MS = 2_500;
+const LIST_POLL_INTERVAL_MS = 3_000;
+const DETAIL_POLL_INTERVAL_MS = 1_500;
 
-const channelClasses: Record<InboxChannel, string> = {
-  Facebook: "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-200",
-  Instagram: "bg-pink-50 text-pink-700 dark:bg-pink-950/50 dark:text-pink-200",
-  LINE: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200",
-  Telegram: "bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-200",
-};
+
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(Math.max(value, minimum), maximum);
@@ -112,6 +108,48 @@ function matchesConversationFilter(
   }
 
   return conversation.status === activeFilter;
+}
+
+function ChannelBadge({ channel }: { channel: InboxChannel }) {
+  if (channel === "Facebook") {
+    return (
+      <div className="absolute -bottom-1 -right-1 flex h-4.5 w-4.5 items-center justify-center rounded-full border-1.5 border-white bg-[#1877F2] text-white dark:border-slate-900 shadow-sm" title="Facebook">
+        <svg viewBox="0 0 24 24" className="h-2.5 w-2.5 fill-current">
+          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+        </svg>
+      </div>
+    );
+  }
+  if (channel === "LINE") {
+    return (
+      <div className="absolute -bottom-1 -right-1 flex h-4.5 w-4.5 items-center justify-center rounded-full border-1.5 border-white bg-[#06C755] text-white dark:border-slate-900 shadow-sm" title="LINE">
+        <svg viewBox="0 0 24 24" className="h-2.5 w-2.5 fill-current">
+          <path d="M24 10.304c0-5.269-5.383-9.556-12-9.556S0 5.035 0 10.304c0 4.724 4.269 8.674 10.038 9.43.391.084.923.258 1.058.592.121.303.079.778.038 1.084l-.167 1.004c-.05.303-.243 1.186 1.047.647 1.29-.539 6.963-4.09 9.492-7.006C22.958 14.394 24 12.487 24 10.304zM9.28 13.23H7.71v-5.96h1.57v5.96zm3.56 0h-3.15v-5.96h1.57v4.39h1.58v1.57zm3.15 0h-1.57v-5.96h1.57v5.96zm4.84 0h-3.14v-5.96h3.14v1.57h-1.57v.63h1.57v1.56h-1.57v.63h1.57v1.57z" />
+        </svg>
+      </div>
+    );
+  }
+  if (channel === "Instagram") {
+    return (
+      <div className="absolute -bottom-1 -right-1 flex h-4.5 w-4.5 items-center justify-center rounded-full border-1.5 border-white bg-gradient-to-tr from-yellow-500 via-pink-500 to-purple-600 text-white dark:border-slate-900 shadow-sm" title="Instagram">
+        <svg viewBox="0 0 24 24" className="h-2.5 w-2.5 stroke-current fill-none" strokeWidth="2.5">
+          <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+          <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+          <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
+        </svg>
+      </div>
+    );
+  }
+  if (channel === "Telegram") {
+    return (
+      <div className="absolute -bottom-1 -right-1 flex h-4.5 w-4.5 items-center justify-center rounded-full border-1.5 border-white bg-[#229ED9] text-white dark:border-slate-900 shadow-sm" title="Telegram">
+        <svg viewBox="0 0 24 24" className="h-2.5 w-2.5 fill-current">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-1-.65-.35-1 .22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.2-.02-.08.02-1.29.82-3.64 2.4l-2.27-.71c-.49-.15-.5-.49.1-.73 4.43-1.93 9.4-3.9 14.9-5.91.56-.2.83-.06.94.13.06.12.04.38-.03.71z"/>
+        </svg>
+      </div>
+    );
+  }
+  return null;
 }
 
 export function InboxWorkspace({
@@ -178,6 +216,7 @@ export function InboxWorkspace({
   const detailUnauthorizedCountRef = useRef(0);
   const selectedConversationIdRef = useRef<string | null>(null);
   const isSendingRef = useRef(false);
+  const sendingConversationIdsRef = useRef<Set<string>>(new Set());
   const isHydrated = useSyncExternalStore(
     () => () => undefined,
     () => true,
@@ -493,6 +532,35 @@ export function InboxWorkspace({
         }
 
         setConversations(nextConversations);
+
+        // Prefetch details for conversations with new messages in the background
+        nextConversations.forEach((conversation) => {
+          const cached = detailCacheRef.current[conversation.id];
+          const hasNewMessage = cached
+            ? new Date(conversation.lastMessageAt).getTime() > new Date(cached.conversation.lastMessageAt).getTime()
+            : conversation.unreadCount > 0;
+
+          if (hasNewMessage) {
+            if (sendingConversationIdsRef.current.has(conversation.id)) {
+              return;
+            }
+
+            void getConversation(conversation.id)
+              .then((detail) => {
+                if (isMounted && !sendingConversationIdsRef.current.has(conversation.id)) {
+                  setDetailCache((prev) => {
+                    const next = { ...prev, [conversation.id]: detail };
+                    detailCacheRef.current = next;
+                    return next;
+                  });
+                }
+              })
+              .catch((err) => {
+                console.error("[PREFETCH] Failed to prefetch conversation details", err);
+              });
+          }
+        });
+
         listUnauthorizedCountRef.current = 0;
         setActiveConversationId((current) => {
           if (
@@ -577,6 +645,10 @@ export function InboxWorkspace({
           return;
         }
 
+        if (sendingConversationIdsRef.current.has(currentConversationId)) {
+          return;
+        }
+
         setDetailCache((prev) => {
           const next = { ...prev, [currentConversationId]: detail };
           detailCacheRef.current = next;
@@ -638,32 +710,100 @@ export function InboxWorkspace({
     shouldInstantScrollRef.current = !!detailCacheRef.current[conversationId];
   };
 
-  const handleSendMessage = async () => {
+  const handleSendMessage = () => {
     const trimmedMessage = messageDraft.trim();
+    const imageToSend = pendingImage;
 
-    if (!selectedConversationId || (!trimmedMessage && !pendingImage) || isSending) {
+    if (!selectedConversationId || (!trimmedMessage && !imageToSend)) {
       return;
     }
 
     setComposerError(null);
     setIsSending(true);
+    sendingConversationIdsRef.current.add(selectedConversationId);
 
-    try {
-      const applySendResult = (
-        result: Awaited<ReturnType<typeof sendConversationMessage>>,
-      ) => {
-        setConversations((current) =>
-          current
-            .map((conversation) =>
-              conversation.id === selectedConversationId
-                ? result.conversation
-                : conversation,
-            )
-            .sort((left, right) =>
-              right.lastMessageAt.localeCompare(left.lastMessageAt),
-            ),
-        );
+    const tempId = `temp-${Date.now()}`;
+    const tempMessage: ConversationMessage = {
+      id: tempId,
+      body: trimmedMessage,
+      createdAt: new Date().toISOString(),
+      senderName: "",
+      type: imageToSend ? "image" : "text",
+      imageUrl: imageToSend ? imageToSend.previewUrl : null,
+      direction: "outbound",
+    };
 
+    // Optimistically update details cache to show message immediately
+    setDetailCache((prev) => {
+      const currentDetail = selectedConversationId ? prev[selectedConversationId] : null;
+      if (!currentDetail || currentDetail.conversation.id !== selectedConversationId) {
+        return prev;
+      }
+      const nextDetail = {
+        ...currentDetail,
+        messages: [...currentDetail.messages, tempMessage],
+      };
+      const next = { ...prev, [selectedConversationId]: nextDetail };
+      detailCacheRef.current = next;
+      return next;
+    });
+
+    // Clear input states immediately
+    setMessageDraft("");
+    if (imageToSend) {
+      setPendingImage(null);
+    }
+
+    // Perform sending in the background
+    const executeSend = async () => {
+      try {
+        const applySendResult = (
+          result: Awaited<ReturnType<typeof sendConversationMessage>>,
+        ) => {
+          setConversations((current) =>
+            current
+              .map((conversation) =>
+                conversation.id === selectedConversationId
+                  ? result.conversation
+                  : conversation,
+              )
+              .sort((left, right) =>
+                right.lastMessageAt.localeCompare(left.lastMessageAt),
+              ),
+          );
+
+          setDetailCache((prev) => {
+            const currentDetail = selectedConversationId ? prev[selectedConversationId] : null;
+            if (!currentDetail || currentDetail.conversation.id !== selectedConversationId) {
+              return prev;
+            }
+            // Replace temporary message with actual sent message
+            const filteredMessages = currentDetail.messages.filter(
+              (msg) => msg.id !== tempId,
+            );
+            const nextDetail = {
+              ...currentDetail,
+              conversation: result.conversation,
+              messages: [...filteredMessages, result.message],
+            };
+            const next = { ...prev, [selectedConversationId]: nextDetail };
+            detailCacheRef.current = next;
+            return next;
+          });
+        };
+
+        if (imageToSend) {
+          const result = await sendConversationImage(selectedConversationId, imageToSend.file);
+          applySendResult(result);
+          URL.revokeObjectURL(imageToSend.previewUrl);
+        } else if (trimmedMessage) {
+          const result = await sendConversationMessage(selectedConversationId, {
+            body: trimmedMessage,
+          });
+          applySendResult(result);
+        }
+      } catch (error) {
+        // Rollback temporary message from cache
         setDetailCache((prev) => {
           const currentDetail = selectedConversationId ? prev[selectedConversationId] : null;
           if (!currentDetail || currentDetail.conversation.id !== selectedConversationId) {
@@ -671,41 +811,30 @@ export function InboxWorkspace({
           }
           const nextDetail = {
             ...currentDetail,
-            conversation: result.conversation,
-            messages: [...currentDetail.messages, result.message],
+            messages: currentDetail.messages.filter((msg) => msg.id !== tempId),
           };
           const next = { ...prev, [selectedConversationId]: nextDetail };
           detailCacheRef.current = next;
           return next;
         });
-      };
 
-      if (pendingImage) {
-        applySendResult(
-          await sendConversationImage(selectedConversationId, pendingImage.file),
+        // Restore message draft if sending failed so user doesn't lose text
+        if (trimmedMessage) {
+          setMessageDraft(trimmedMessage);
+        }
+
+        setComposerError(
+          error instanceof ApiError
+            ? error.message
+            : t("sendError"),
         );
-        URL.revokeObjectURL(pendingImage.previewUrl);
-        setPendingImage(null);
+      } finally {
+        sendingConversationIdsRef.current.delete(selectedConversationId);
+        setIsSending(false);
       }
+    };
 
-      if (trimmedMessage) {
-        applySendResult(
-          await sendConversationMessage(selectedConversationId, {
-            body: trimmedMessage,
-          }),
-        );
-      }
-
-      setMessageDraft("");
-    } catch (error) {
-      setComposerError(
-        error instanceof ApiError
-          ? error.message
-          : t("sendError"),
-      );
-    } finally {
-      setIsSending(false);
-    }
+    void executeSend();
   };
 
   const handleImageSelection = (event: ChangeEvent<HTMLInputElement>) => {
@@ -975,22 +1104,25 @@ export function InboxWorkspace({
                       >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex min-w-0 gap-3">
-                          {conversation.customerAvatarImageUrl ? (
-                            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-slate-100">
-                              <Image
-                                alt={conversation.customerName}
-                                className="object-cover"
-                                fill
-                                sizes="44px"
-                                src={conversation.customerAvatarImageUrl}
-                                unoptimized
-                              />
-                            </div>
-                          ) : (
-                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-950 text-sm font-semibold text-white dark:bg-slate-800">
-                              {conversation.customerAvatarFallback}
-                            </div>
-                          )}
+                          <div className="relative h-11 w-11 shrink-0">
+                            {conversation.customerAvatarImageUrl ? (
+                              <div className="h-11 w-11 overflow-hidden rounded-full bg-slate-100">
+                                <Image
+                                  alt={conversation.customerName}
+                                  className="object-cover"
+                                  fill
+                                  sizes="44px"
+                                  src={conversation.customerAvatarImageUrl}
+                                  unoptimized
+                                />
+                              </div>
+                            ) : (
+                              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-950 text-sm font-semibold text-white dark:bg-slate-800">
+                                {conversation.customerAvatarFallback}
+                              </div>
+                            )}
+                            <ChannelBadge channel={conversation.channel} />
+                          </div>
                           <div className="min-w-0 space-y-1">
                             <div className="flex items-center gap-2">
                               <p
@@ -1001,14 +1133,6 @@ export function InboxWorkspace({
                               >
                                 {conversation.customerName}
                               </p>
-                              <span
-                                className={classNames(
-                                  "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]",
-                                  channelClasses[conversation.channel],
-                                )}
-                              >
-                                {conversation.channel}
-                              </span>
                               <span className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-400" />
                             </div>
                             <p
@@ -1140,23 +1264,35 @@ export function InboxWorkspace({
                   className="min-h-0 flex-1 overflow-y-auto bg-[#f6fbfd] px-4 py-4 dark:bg-slate-950"
                 >
                   <div className="space-y-4">
-                    {activeMessages.map((message, index) => {
-                      const previousMessage = activeMessages[index - 1];
-                      const currentDay = new Date(message.createdAt).toDateString();
-                      const previousDay = previousMessage
-                        ? new Date(previousMessage.createdAt).toDateString()
-                        : null;
+                    {(() => {
+                      const latestOutboundIndex = (() => {
+                        for (let i = activeMessages.length - 1; i >= 0; i--) {
+                          if (activeMessages[i].direction === "outbound") {
+                            return i;
+                          }
+                        }
+                        return -1;
+                      })();
 
-                      return (
-                        <MessageBubble
-                          key={message.id}
-                          isFirstOfDay={currentDay !== previousDay}
-                          message={message}
-                          customerAvatarUrl={activeConversation.customerAvatarImageUrl}
-                          customerAvatarFallback={activeConversation.customerAvatarFallback}
-                        />
-                      );
-                    })}
+                      return activeMessages.map((message, index) => {
+                        const previousMessage = activeMessages[index - 1];
+                        const currentDay = new Date(message.createdAt).toDateString();
+                        const previousDay = previousMessage
+                          ? new Date(previousMessage.createdAt).toDateString()
+                          : null;
+
+                        return (
+                          <MessageBubble
+                            key={message.id}
+                            isFirstOfDay={currentDay !== previousDay}
+                            message={message}
+                            customerAvatarUrl={activeConversation.customerAvatarImageUrl}
+                            customerAvatarFallback={activeConversation.customerAvatarFallback}
+                            isLatestOutbound={index === latestOutboundIndex}
+                          />
+                        );
+                      });
+                    })()}
                     <div ref={messagesEndRef} />
                   </div>
                 </div>
@@ -1214,7 +1350,7 @@ export function InboxWorkspace({
                           value={messageDraft}
                           onChange={(event) => setMessageDraft(event.target.value)}
                           onKeyDown={handleMessageKeyDown}
-                          disabled={!activeConversation || isSending}
+                          disabled={!activeConversation}
                           rows={1}
                         />
                       </div>
@@ -1222,7 +1358,7 @@ export function InboxWorkspace({
                         <button
                           aria-label={t("attachImage")}
                           className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600 ring-1 ring-blue-100 transition hover:bg-blue-100 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-cyan-500/10 dark:text-cyan-300 dark:ring-cyan-500/20 dark:hover:bg-cyan-500/20"
-                          disabled={!activeConversation || isSending}
+                          disabled={!activeConversation}
                           type="button"
                           onClick={() => imageInputRef.current?.click()}
                         >
@@ -1248,7 +1384,7 @@ export function InboxWorkspace({
                         </div>
                       </div>
                       <button
-                        aria-label={isSending ? t("sending") : t("send")}
+                        aria-label={t("send")}
                         data-testid="send-message-button"
                         className={classNames(
                           "inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full shadow-lg shadow-cyan-500/20 transition",
@@ -1256,11 +1392,11 @@ export function InboxWorkspace({
                             ? "cursor-not-allowed bg-slate-300 text-slate-500 dark:bg-slate-800 dark:text-slate-600"
                             : "bg-gradient-to-br from-sky-500 to-cyan-500 text-white hover:from-sky-400 hover:to-cyan-400 dark:text-slate-950",
                         )}
-                        disabled={!activeConversation || (!messageDraft.trim() && !pendingImage) || isSending}
+                        disabled={!activeConversation || (!messageDraft.trim() && !pendingImage)}
                         type="button"
                         onClick={handleSendMessage}
                       >
-                        {isSending ? <Spinner className="text-current" /> : <SendHorizonal className="h-5 w-5" />}
+                        <SendHorizonal className="h-5 w-5" />
                       </button>
                     </div>
                   </div>
